@@ -1,4 +1,5 @@
 import { OrthogonalPathfinder } from './OrthogonalPathfinder.js';
+import { OrganicPathfinder } from './OrganicPathfinder.js';
 import { NodeComponent } from './NodeComponent.js';
 
 /**
@@ -28,8 +29,14 @@ export class CanvasJourneyGrid {
     this.nodeComponents = new Map(); // distance -> NodeComponent instances
     this.maxDistance = 0;
     
-    // Pathfinding
-    this.pathfinder = new OrthogonalPathfinder();
+    // Pathfinding - toggle between styles
+    this.useOrganicPaths = true; // Set to false for orthogonal paths
+    this.orthogonalPathfinder = new OrthogonalPathfinder();
+    this.organicPathfinder = new OrganicPathfinder(
+      this.CELL_SIZE,
+      this.CELL_PADDING,
+      this.CELLS_PER_ROW
+    );
     
     // DOM overlay for interactive nodes
     this.nodeOverlay = null;
@@ -232,43 +239,152 @@ export class CanvasJourneyGrid {
   }
   
   /**
+   * Calculate serpentine cell index from row/col coordinates
+   * This gives us the proper ordering for serpentine traversal
+   */
+  getSerpentineCellIndex(row, col) {
+    const cellsPerRow = this.CELLS_PER_ROW;
+    const isEvenRow = row % 2 === 0;
+
+    // Even rows go left-to-right (0,1,2,3,4)
+    // Odd rows go right-to-left (4,3,2,1,0)
+    const colInSerpentine = isEvenRow ? col : (cellsPerRow - 1 - col);
+
+    // Cell index = row * cellsPerRow + column position in that row
+    return row * cellsPerRow + colInSerpentine;
+  }
+
+  /**
    * Draw orthogonal roads using grid-based pathfinding
    */
   drawRoads(visibleTop, visibleBottom) {
+    // Sort nodes in SERPENTINE ORDER, not by distance!
     const sortedNodes = Array.from(this.nodes.values())
-      .sort((a, b) => a.distance - b.distance);
-    
+      .sort((a, b) => {
+        // Calculate serpentine cell index for proper ordering
+        const cellA = this.getSerpentineCellIndex(a.coords.row, a.coords.col);
+        const cellB = this.getSerpentineCellIndex(b.coords.row, b.coords.col);
+        return cellA - cellB;
+      });
+
     if (sortedNodes.length < 2) return;
-    
+
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
-    
-    // Draw orthogonal paths between consecutive nodes
+
+    // Use organic or orthogonal paths based on setting
+    if (this.useOrganicPaths) {
+      // Generate waypoints for debugging
+      const waypoints = this.organicPathfinder.generateOrganicWaypoints(sortedNodes);
+
+      // Draw the organic path
+      const organicPath = this.organicPathfinder.createOrganicSerpentinePath(sortedNodes);
+      this.drawOrganicPath(organicPath);
+
+      // DEBUG: Draw red dots at waypoints
+      this.drawWaypointDebug(waypoints);
+    } else {
+      // Generate complete serpentine path with waypoints
+      const fullPath = this.generateFullSerpentinePath(sortedNodes);
+      console.log(`🛣️ Drawing full serpentine path through ${fullPath.length} waypoints`);
+
+      // Draw the complete path
+      if (fullPath && fullPath.length > 1) {
+        this.drawOrthogonalPath(fullPath, false);
+      }
+    }
+  }
+
+  /**
+   * Generate complete serpentine path including waypoints at row ends
+   */
+  generateFullSerpentinePath(sortedNodes) {
+    if (sortedNodes.length === 0) return [];
+
+    const waypoints = [];
+    const firstNode = sortedNodes[0];
+    const lastNode = sortedNodes[sortedNodes.length - 1];
+
+    // Start at first node
+    waypoints.push(this.getNodeCenter(firstNode));
+
+    // For each pair of consecutive nodes, fill in the serpentine path
     for (let i = 0; i < sortedNodes.length - 1; i++) {
       const fromNode = sortedNodes[i];
       const toNode = sortedNodes[i + 1];
-      
-      // Determine connection sides based on serpentine pattern
-      const { fromSide, toSide } = this.getConnectionSides(fromNode, toNode);
-      
-      // Convert nodes to bounds format for pathfinder
-      const fromBounds = this.nodeToBounds(fromNode);
-      const toBounds = this.nodeToBounds(toNode);
-      
-      // Check if path is visible
-      const minY = Math.min(fromBounds.top, toBounds.top);
-      const maxY = Math.max(fromBounds.bottom, toBounds.bottom);
-      
-      if (maxY >= visibleTop - 100 && minY <= visibleBottom + 100) {
-        // Find orthogonal path with correct connection sides
-        const path = this.pathfinder.findPathWithSides(fromBounds, toBounds, fromSide, toSide);
 
-        // Draw the path with rounded corners
-        if (path && path.length > 1) {
-          this.drawOrthogonalPath(path, i === 0); // First path has dashed center line
-        }
-      }
+      // Add intermediate waypoints for the serpentine flow
+      const intermediates = this.getSerpentineWaypoints(fromNode, toNode);
+      waypoints.push(...intermediates);
+
+      // Add the next node
+      waypoints.push(this.getNodeCenter(toNode));
     }
+
+    return waypoints;
+  }
+
+  /**
+   * Get serpentine waypoints between two nodes
+   */
+  getSerpentineWaypoints(fromNode, toNode) {
+    const waypoints = [];
+    const fromRow = fromNode.coords.row;
+    const toRow = toNode.coords.row;
+    const fromCol = fromNode.coords.col;
+    const toCol = toNode.coords.col;
+
+    // Same row - no waypoints needed
+    if (fromRow === toRow) {
+      return waypoints;
+    }
+
+    // Different rows - need to traverse serpentine pattern
+    const isFromEvenRow = fromRow % 2 === 0;
+
+    // Add waypoint at end of fromNode's row
+    const fromRowEndCol = isFromEvenRow ? 4 : 0;
+    if (fromCol !== fromRowEndCol) {
+      waypoints.push(this.getCellCenter(fromRow, fromRowEndCol));
+    }
+
+    // Add waypoints for each intermediate row
+    for (let row = fromRow + 1; row < toRow; row++) {
+      const isEvenRow = row % 2 === 0;
+      const startCol = isEvenRow ? 0 : 4;
+      const endCol = isEvenRow ? 4 : 0;
+
+      waypoints.push(this.getCellCenter(row, startCol));
+      waypoints.push(this.getCellCenter(row, endCol));
+    }
+
+    // Add waypoint at start of toNode's row
+    const isToEvenRow = toRow % 2 === 0;
+    const toRowStartCol = isToEvenRow ? 0 : 4;
+    if (toCol !== toRowStartCol) {
+      waypoints.push(this.getCellCenter(toRow, toRowStartCol));
+    }
+
+    return waypoints;
+  }
+
+  /**
+   * Get center point of a cell
+   */
+  getCellCenter(row, col) {
+    const x = col * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_SIZE / 2;
+    const y = row * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_SIZE / 2;
+    return { x, y };
+  }
+
+  /**
+   * Get center point of a node
+   */
+  getNodeCenter(node) {
+    return {
+      x: node.coords.x + this.CELL_SIZE / 2,
+      y: node.coords.y + this.CELL_SIZE / 2
+    };
   }
   
   /**
@@ -344,6 +460,56 @@ export class CanvasJourneyGrid {
     };
   }
   
+  /**
+   * Draw organic curved path
+   */
+  drawOrganicPath(path2d) {
+    const ctx = this.ctx;
+
+    // Draw road layers for depth (doubled thickness)
+    // Shadow layer
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 16;
+    ctx.globalAlpha = 0.3;
+    ctx.stroke(path2d);
+
+    // Main road surface
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 12;
+    ctx.globalAlpha = 1.0;
+    ctx.stroke(path2d);
+
+    // Center line (optional)
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.5;
+    ctx.stroke(path2d);
+
+    ctx.globalAlpha = 1.0;
+  }
+
+  /**
+   * DEBUG: Draw red dots at waypoints
+   */
+  drawWaypointDebug(waypoints) {
+    const ctx = this.ctx;
+    ctx.fillStyle = 'red';
+    ctx.globalAlpha = 1.0;
+
+    waypoints.forEach((wp, index) => {
+      // Draw red dot
+      ctx.beginPath();
+      ctx.arc(wp.x, wp.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw waypoint number
+      ctx.fillStyle = 'white';
+      ctx.font = '10px monospace';
+      ctx.fillText(index, wp.x + 6, wp.y - 6);
+      ctx.fillStyle = 'red';
+    });
+  }
+
   /**
    * Draw orthogonal path with rounded corners
    */
