@@ -1,0 +1,21 @@
+{
+  "display": {
+    "icon": "📷",
+    "color": "#4CAF50",
+    "size": "40px"
+  },
+  "content": [
+    { "field": "title", "type": "header" },
+    { "field": "image", "type": "image" },
+    { "field": "images", "type": "gallery" },
+    { "field": "description", "type": "text" },
+    { "field": "location", "type": "text", "icon": "📍" },
+    { "field": "weather", "type": "text", "icon": "🌤️" },
+    { "field": "mood", "type": "text", "icon": "😊" },
+    { "field": "tags", "type": "tags" }
+  ],
+  "modal": {
+    "title": "📷 Journey Photo",
+    "width": "500px"
+  }
+}

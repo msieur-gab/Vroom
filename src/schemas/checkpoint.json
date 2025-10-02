@@ -1,0 +1,19 @@
+{
+  "display": {
+    "icon": "📍",
+    "color": "#2196F3",
+    "size": "35px"
+  },
+  "content": [
+    { "field": "title", "type": "header" },
+    { "field": "status", "type": "status" },
+    { "field": "timestamp", "type": "datetime" },
+    { "field": "weather", "type": "text", "icon": "🌤️" },
+    { "field": "temperature", "type": "text", "icon": "🌡️", "suffix": "°C" },
+    { "field": "notes", "type": "text" }
+  ],
+  "modal": {
+    "title": "📍 Checkpoint Details",
+    "width": "400px"
+  }
+}

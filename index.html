@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Vroom Grid - Travel Adventure</title>
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="./styles/main.css">
+    <link rel="stylesheet" href="./styles/grid.css">
+    
+    <!-- Prevent zoom on input focus (iOS) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+</head>
+<body>
+    <!-- App Container -->
+    <div id="app" class="app-container">
+        
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">
+                    <span class="title-icon">🗺️</span>
+                    <span class="title-text">Vroom Grid</span>
+                </h1>
+                <div class="header-stats">
+                    <div class="stat-item">
+                        <span class="stat-value" id="total-distance">0 km</span>
+                        <span class="stat-label">Distance</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="photo-count">0</span>
+                        <span class="stat-label">Photos</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-value" id="milestone-count">0</span>
+                        <span class="stat-label">Badges</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Main Content Area -->
+        <main class="app-main">
+            
+            <!-- Travel Grid Container -->
+            <div class="grid-container">
+                <!-- Responsive grid will be injected here by ResponsiveGrid.js -->
+                
+                
+                <!-- Loading Overlay -->
+                <div id="loading-overlay" class="loading-overlay hidden">
+                    <div class="loading-content">
+                        <div class="loading-spinner"></div>
+                        <p class="loading-text">Loading your journey...</p>
+                    </div>
+                </div>
+            </div>
+            
+        </main>
+        
+        <!-- Bottom Action Bar -->
+        <div class="bottom-actions">
+            <button id="take-photo-btn" class="action-btn primary">
+                <span class="btn-icon">📸</span>
+                <span class="btn-text">Take Photo</span>
+            </button>
+            <button id="view-milestones-btn" class="action-btn secondary">
+                <span class="btn-icon">🏆</span>
+                <span class="btn-text">Milestones</span>
+            </button>
+            <button id="settings-btn" class="action-btn secondary">
+                <span class="btn-icon">⚙️</span>
+                <span class="btn-text">Settings</span>
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Photo Preview Modal -->
+    <div id="photo-preview-modal" class="modal-overlay hidden">
+        <div class="photo-preview-content">
+            <div class="preview-header">
+                <h2>📸 Photo Preview</h2>
+                <button id="preview-close-btn" class="close-btn">✕</button>
+            </div>
+            <div class="preview-image-container">
+                <img id="preview-image" src="" alt="Preview">
+            </div>
+            <div class="preview-info">
+                <div class="info-item">
+                    <span class="info-icon">📍</span>
+                    <span id="preview-location">Getting location...</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-icon">📏</span>
+                    <span id="preview-distance">Calculating distance...</span>
+                </div>
+            </div>
+            <div class="preview-actions">
+                <button id="preview-reject-btn" class="preview-btn reject">
+                    <span class="btn-icon">❌</span>
+                    <span class="btn-text">Retake</span>
+                </button>
+                <button id="preview-accept-btn" class="preview-btn accept">
+                    <span class="btn-icon">✅</span>
+                    <span class="btn-text">Add to Journey</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="./src/app.js"></script>
+    
+</body>
+</html>

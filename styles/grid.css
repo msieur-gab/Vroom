@@ -1,0 +1,175 @@
+/* Responsive Travel Grid System */
+
+:root {
+  /* Grid configuration */
+  --min-cell-size: 44px;
+  --km-per-cell: 20;
+  
+  /* Calculated values (set by JavaScript) */
+  --screen-width: 100vw;
+  --max-columns: 10;
+  --cell-size: var(--min-cell-size);
+  
+  /* Development colors */
+  --dev-grid-border: #333333;
+  --dev-grid-bg: rgba(255, 255, 255, 0.02);
+  --dev-cell-hover: rgba(255, 255, 255, 0.1);
+}
+
+/* Main travel grid container */
+.travel-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--max-columns), var(--cell-size));
+  grid-auto-rows: var(--cell-size);
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background: var(--background-dark);
+  
+  /* Enable smooth scrolling */
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  /* Remove default gaps */
+  gap: 0;
+  
+  /* Optimize for mobile scrolling */
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Individual grid cells */
+.grid-cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  position: relative;
+  
+  /* Development grid visibility */
+  border: 1px solid transparent;
+  background: transparent;
+  
+  /* Ensure square aspect ratio */
+  aspect-ratio: 1;
+  
+  /* Center content within cell */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Development mode: show grid lines */
+.travel-grid[data-dev-grid="visible"] .grid-cell {
+  border: 1px solid var(--dev-grid-border);
+  background: var(--dev-grid-bg);
+}
+
+.travel-grid[data-dev-grid="visible"] .grid-cell:hover {
+  background: var(--dev-cell-hover);
+}
+
+/* Distance labels for development */
+.travel-grid[data-dev-grid="visible"] .grid-cell::before {
+  content: attr(data-distance);
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  font-size: 8px;
+  color: #666;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* Grid cell states */
+.grid-cell[data-has-node="true"] {
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.travel-grid[data-dev-grid="visible"] .grid-cell[data-has-node="true"] {
+  border-color: #4CAF50;
+  background: rgba(76, 175, 80, 0.2);
+}
+
+/* Responsive breakpoints */
+@media (max-width: 320px) {
+  :root {
+    --max-columns: 7; /* Minimum for very small screens */
+  }
+}
+
+@media (min-width: 321px) and (max-width: 480px) {
+  :root {
+    --max-columns: 8;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  :root {
+    --max-columns: 10;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  :root {
+    --max-columns: 15;
+  }
+}
+
+@media (min-width: 1025px) {
+  :root {
+    --max-columns: 20;
+  }
+}
+
+/* Development debug info */
+.grid-debug {
+  position: fixed;
+  top: 60px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 11px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.grid-debug[data-visible="false"] {
+  display: none;
+}
+
+/* Ensure grid fills container properly */
+.grid-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Road connections (placeholder for now) */
+.road-connection {
+  position: absolute;
+  background: var(--primary-color);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.road-connection.horizontal {
+  height: 3px;
+}
+
+.road-connection.vertical {
+  width: 3px;
+}
+
+/* Travel nodes positioning within cells */
+.travel-node {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

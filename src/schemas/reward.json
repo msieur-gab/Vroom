@@ -1,0 +1,19 @@
+{
+  "display": {
+    "icon": "🏆",
+    "color": "#9C27B0",
+    "size": "42px"
+  },
+  "content": [
+    { "field": "name", "type": "header" },
+    { "field": "rarity", "type": "rarity" },
+    { "field": "description", "type": "text" },
+    { "field": "points", "type": "stat", "icon": "⭐", "suffix": " points" },
+    { "field": "criteria", "type": "list" },
+    { "field": "earnedDate", "type": "date" }
+  ],
+  "modal": {
+    "title": "🏆 Achievement Unlocked!",
+    "width": "450px"
+  }
+}

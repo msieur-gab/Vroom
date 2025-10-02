@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node Component Prototype</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .prototype-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        
+        .grid-background {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px);
+            background-size: 40px 40px;
+            opacity: 0.3;
+        }
+        
+        .instructions {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            background: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .btn:hover {
+            background: #1976D2;
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            background: rgba(255,255,255,0.9);
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <h1>Node Component Prototype</h1>
+    <p>Testing interactive nodes with modal/expansion functionality</p>
+    
+    <div class="prototype-container" id="container">
+        <div class="grid-background"></div>
+        
+        <div class="instructions">
+            Click on any node to see its information!
+        </div>
+        
+        <div class="controls">
+            <button class="btn" onclick="addRandomNode()">Add Random Node</button>
+            <button class="btn" onclick="clearNodes()">Clear All</button>
+            <button class="btn" onclick="addTestScenario()">Test Scenario</button>
+        </div>
+        
+        <div class="info-panel">
+            <h4>Node Types:</h4>
+            <div>📷 Photo nodes</div>
+            <div>🏁 Milestone nodes</div>
+            <div>📍 Checkpoint nodes</div>
+            <div>🏆 Badge nodes</div>
+            <br>
+            <div id="nodeCount">Nodes: 0</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { NodeComponent } from './src/ui/NodeComponent.js';
+        
+        let nodes = [];
+        let nodeCounter = 0;
+        
+        // Sample data schemas for different node types
+        const nodeSchemas = {
+            photo: {
+                type: 'photo',
+                data: {
+                    title: 'Beautiful Sunset',
+                    description: 'Captured this amazing sunset during my evening walk. The colors were absolutely breathtaking.',
+                    image: 'https://picsum.photos/400/300?random=1',
+                    images: [
+                        'https://picsum.photos/200/150?random=2',
+                        'https://picsum.photos/200/150?random=3',
+                        'https://picsum.photos/200/150?random=4'
+                    ],
+                    camera: 'iPhone 14 Pro',
+                    location: 'Golden Gate Park',
+                    tags: ['sunset', 'nature', 'peaceful']
+                }
+            },
+            milestone: {
+                type: 'milestone',
+                data: {
+                    title: '100km Milestone',
+                    description: 'Reached my first major distance milestone!',
+                    achievement: 'Century Walker',
+                    date: new Date().toLocaleDateString(),
+                    celebration: 'Treated myself to a nice dinner'
+                }
+            },
+            checkpoint: {
+                type: 'checkpoint',
+                data: {
+                    title: 'Daily Checkpoint',
+                    description: 'End of day 5 checkpoint',
+                    weather: 'Sunny, 22°C',
+                    mood: 'Energetic',
+                    steps: 15420,
+                    time: '18:30'
+                }
+            },
+            badge: {
+                type: 'badge',
+                data: {
+                    title: 'Early Bird',
+                    description: 'Started journey before sunrise!',
+                    achievement: 'Rise and Shine',
+                    rarity: 'Common',
+                    earnedDate: new Date().toLocaleDateString(),
+                    points: 50
+                }
+            }
+        };
+        
+        window.addRandomNode = function() {
+            const container = document.getElementById('container');
+            const types = Object.keys(nodeSchemas);
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            
+            const nodeData = {
+                ...nodeSchemas[randomType],
+                distance: Math.floor(Math.random() * 500) + 1,
+                coords: {
+                    x: Math.random() * (800 - 80) + 40,
+                    y: Math.random() * (600 - 120) + 60
+                },
+                id: ++nodeCounter
+            };
+            
+            const node = new NodeComponent(nodeData, container);
+            nodes.push(node);
+            updateNodeCount();
+        };
+        
+        window.clearNodes = function() {
+            nodes.forEach(node => node.destroy());
+            nodes = [];
+            nodeCounter = 0;
+            updateNodeCount();
+        };
+        
+        window.addTestScenario = function() {
+            clearNodes();
+            
+            // Add a variety of test nodes
+            const testNodes = [
+                { type: 'photo', x: 150, y: 150, distance: 25 },
+                { type: 'milestone', x: 350, y: 200, distance: 100 },
+                { type: 'checkpoint', x: 550, y: 150, distance: 180 },
+                { type: 'badge', x: 250, y: 350, distance: 250 },
+                { type: 'photo', x: 450, y: 400, distance: 320 }
+            ];
+            
+            testNodes.forEach(nodeConfig => {
+                const container = document.getElementById('container');
+                const nodeData = {
+                    ...nodeSchemas[nodeConfig.type],
+                    distance: nodeConfig.distance,
+                    coords: {
+                        x: nodeConfig.x,
+                        y: nodeConfig.y
+                    },
+                    id: ++nodeCounter
+                };
+                
+                const node = new NodeComponent(nodeData, container);
+                nodes.push(node);
+            });
+            
+            updateNodeCount();
+        };
+        
+        function updateNodeCount() {
+            document.getElementById('nodeCount').textContent = `Nodes: ${nodes.length}`;
+        }
+        
+        // Add some initial test nodes
+        setTimeout(() => {
+            addTestScenario();
+        }, 500);
+        
+        // Make functions available globally for testing
+        window.nodes = nodes;
+        window.NodeComponent = NodeComponent;
+        window.nodeSchemas = nodeSchemas;
+    </script>
+</body>
+</html>

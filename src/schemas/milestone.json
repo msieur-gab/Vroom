@@ -1,0 +1,19 @@
+{
+  "display": {
+    "icon": "🏁",
+    "color": "#FF9800",
+    "size": "45px"
+  },
+  "content": [
+    { "field": "achievement", "type": "header" },
+    { "field": "description", "type": "text" },
+    { "field": "celebration", "type": "celebration" },
+    { "field": "totalDistance", "type": "stat", "icon": "📏", "suffix": "km" },
+    { "field": "timeElapsed", "type": "stat", "icon": "⏱️", "suffix": "h" },
+    { "field": "badgeEarned", "type": "badge" }
+  ],
+  "modal": {
+    "title": "🏁 Milestone Reached!",
+    "width": "450px"
+  }
+}
