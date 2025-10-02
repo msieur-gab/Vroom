@@ -12,10 +12,11 @@
  */
 
 export class OrganicPathfinder {
-  constructor(cellSize, cellPadding, cellsPerRow) {
+  constructor(cellSize, cellPadding, cellsPerRow, horizontalPadding = 30) {
     this.CELL_SIZE = cellSize;
     this.CELL_PADDING = cellPadding;
     this.CELLS_PER_ROW = cellsPerRow;
+    this.HORIZONTAL_PADDING = horizontalPadding;
 
     // Radius for quarter-circle turns
     // This is the radius of the semicircle formed by two quarter circles
@@ -147,33 +148,12 @@ export class OrganicPathfinder {
 
     const waypoints = [];
 
-    // Start at first node - but adjust if it's in a boundary cell
+    // Start at first node - always use cell center
     const firstNode = nodes[0];
     const firstCol = firstNode.coords.col;
     const firstRow = firstNode.coords.row;
-    const isFirstEvenRow = firstRow % 2 === 0;
 
-    // If starting in a boundary cell (col 0 or col 4), start at the inner edge
-    if (firstCol === 0 && !isFirstEvenRow) {
-      // Starting in leftmost cell of odd row (R→L) - start at right edge of cell
-      waypoints.push(this.getCellTurnPoint(firstRow, firstCol, false));
-    } else if (firstCol === this.CELLS_PER_ROW - 1 && isFirstEvenRow) {
-      // Starting in rightmost cell of even row (L→R) - start at left edge of cell
-      waypoints.push({
-        x: firstNode.coords.x,
-        y: firstNode.coords.y + this.CELL_SIZE / 2,
-        row: firstRow,
-        col: firstCol
-      });
-    } else {
-      // Starting in a middle cell - use center
-      waypoints.push({
-        x: firstNode.coords.x + this.CELL_SIZE / 2,
-        y: firstNode.coords.y + this.CELL_SIZE / 2,
-        row: firstRow,
-        col: firstCol
-      });
-    }
+    waypoints.push(this.getCellCenter(firstRow, firstCol));
 
     // For each pair of consecutive nodes
     for (let i = 0; i < nodes.length - 1; i++) {
@@ -184,118 +164,43 @@ export class OrganicPathfinder {
       const fromCol = fromNode.coords.col;
       const toCol = toNode.coords.col;
 
-      // Same row - need to check if we cross boundary cells
+      // Same row - just add destination cell center
       if (fromRow === toRow) {
-        const isEvenRow = fromRow % 2 === 0;
-        const direction = isEvenRow ? 1 : -1; // L→R = +1, R→L = -1
-
-        // Check if toNode is in a boundary cell
-        const isToBoundary = (toCol === 0) || (toCol === this.CELLS_PER_ROW - 1);
-
-        if (isToBoundary) {
-          // Destination is in boundary cell - stop at the inner edge, not center
-          if (toCol === 0) {
-            // Left boundary - add waypoint at right edge of leftmost cell
-            waypoints.push({
-              x: toNode.coords.x + this.CELL_SIZE,
-              y: toNode.coords.y + this.CELL_SIZE / 2,
-              row: toRow,
-              col: toCol
-            });
-          } else {
-            // Right boundary - add waypoint at left edge of rightmost cell
-            waypoints.push({
-              x: toNode.coords.x,
-              y: toNode.coords.y + this.CELL_SIZE / 2,
-              row: toRow,
-              col: toCol
-            });
-          }
-        } else {
-          // Middle cell - use center
-          waypoints.push({
-            x: toNode.coords.x + this.CELL_SIZE / 2,
-            y: toNode.coords.y + this.CELL_SIZE / 2,
-            row: toRow,
-            col: toCol
-          });
-        }
+        waypoints.push(this.getCellCenter(toRow, toCol));
         continue;
       }
 
       // Different rows - add serpentine waypoints
       const isFromEvenRow = fromRow % 2 === 0;
 
-      // Add waypoint BEFORE entering the boundary cell (at the edge between cells 3-4 or 1-2)
-      const fromBoundaryCol = isFromEvenRow ? (this.CELLS_PER_ROW - 2) : 1; // Cell 4 or Cell 2
+      // Add waypoint at CENTER of arc cell (cell 0 for left turns, cell 4 for right turns)
+      const fromArcCol = isFromEvenRow ? (this.CELLS_PER_ROW - 1) : 0; // Cell 4 or Cell 0
 
-      if (fromCol < fromBoundaryCol && isFromEvenRow) {
-        // Need to travel to cell 4 boundary (before cell 5)
-        waypoints.push(this.getCellBoundary(fromRow, fromBoundaryCol, true)); // Right edge of cell 4
-      } else if (fromCol > fromBoundaryCol && !isFromEvenRow) {
-        // Need to travel to cell 2 boundary (before cell 1)
-        waypoints.push(this.getCellBoundary(fromRow, fromBoundaryCol, false)); // Left edge of cell 2
-      } else if (fromCol === fromBoundaryCol) {
-        // Already at boundary cell - add edge waypoint
-        waypoints.push(this.getCellBoundary(fromRow, fromBoundaryCol, isFromEvenRow));
+      if (fromCol !== fromArcCol) {
+        // Need to travel to arc cell center
+        waypoints.push(this.getCellCenter(fromRow, fromArcCol));
       }
 
       // Add waypoints for each intermediate row
       for (let row = fromRow + 1; row < toRow; row++) {
         const isEvenRow = row % 2 === 0;
 
-        // Entry point: boundary between cells 1-2 or 4-5
-        const entryBoundaryCol = isEvenRow ? 1 : (this.CELLS_PER_ROW - 2); // Cell 2 or Cell 4
-        waypoints.push(this.getCellBoundary(row, entryBoundaryCol, !isEvenRow));
+        // Entry point: center of arc cell (cell 0 or cell 4)
+        const entryArcCol = isEvenRow ? 0 : (this.CELLS_PER_ROW - 1); // Cell 0 or Cell 4
+        waypoints.push(this.getCellCenter(row, entryArcCol));
 
-        // Exit point: boundary between cells 1-2 or 4-5
-        const exitBoundaryCol = isEvenRow ? (this.CELLS_PER_ROW - 2) : 1; // Cell 4 or Cell 2
-        waypoints.push(this.getCellBoundary(row, exitBoundaryCol, isEvenRow));
+        // Exit point: center of arc cell (cell 0 or cell 4)
+        const exitArcCol = isEvenRow ? (this.CELLS_PER_ROW - 1) : 0; // Cell 4 or Cell 0
+        waypoints.push(this.getCellCenter(row, exitArcCol));
       }
 
-      // Add waypoint AFTER exiting the boundary cell in destination row
+      // Add waypoint at CENTER of arc cell in destination row
       const isToEvenRow = toRow % 2 === 0;
-      const toBoundaryCol = isToEvenRow ? 1 : (this.CELLS_PER_ROW - 2); // Cell 2 or Cell 4
-      waypoints.push(this.getCellBoundary(toRow, toBoundaryCol, !isToEvenRow));
+      const toArcCol = isToEvenRow ? 0 : (this.CELLS_PER_ROW - 1); // Cell 0 or Cell 4
+      waypoints.push(this.getCellCenter(toRow, toArcCol));
 
-
-      // Add destination node - check if it's in a boundary cell
-      const isDestBoundary = (toCol === 0) || (toCol === this.CELLS_PER_ROW - 1);
-
-      if (isDestBoundary) {
-        // Destination is in boundary cell - add waypoint at inner edge only if different from current position
-        if (toCol === 0) {
-          // Leftmost cell
-          const edgeX = toNode.coords.x + this.CELL_SIZE;
-          if (waypoints[waypoints.length - 1].x !== edgeX) {
-            waypoints.push({
-              x: edgeX,
-              y: toNode.coords.y + this.CELL_SIZE / 2,
-              row: toRow,
-              col: toCol
-            });
-          }
-        } else {
-          // Rightmost cell
-          const edgeX = toNode.coords.x;
-          if (waypoints[waypoints.length - 1].x !== edgeX) {
-            waypoints.push({
-              x: edgeX,
-              y: toNode.coords.y + this.CELL_SIZE / 2,
-              row: toRow,
-              col: toCol
-            });
-          }
-        }
-      } else {
-        // Middle cell - use center
-        waypoints.push({
-          x: toNode.coords.x + this.CELL_SIZE / 2,
-          y: toNode.coords.y + this.CELL_SIZE / 2,
-          row: toRow,
-          col: toCol
-        });
-      }
+      // Add destination node center
+      waypoints.push(this.getCellCenter(toRow, toCol));
     }
 
     return waypoints;
@@ -313,7 +218,7 @@ export class OrganicPathfinder {
    * - Left edge of cell 4 (boundary between cells 3-4) for right entry
    */
   getCellBoundary(row, col, isRightEdge) {
-    const baseX = this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
+    const baseX = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
     const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
 
     if (isRightEdge) {
@@ -331,8 +236,8 @@ export class OrganicPathfinder {
    * Get center point of a cell by row/col
    */
   getCellCenter(row, col) {
-    const x = col * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_SIZE / 2;
-    const y = row * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_SIZE / 2;
+    const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
+    const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
     return { x, y, row, col };
   }
 

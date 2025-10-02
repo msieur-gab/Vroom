@@ -17,8 +17,11 @@ export class CanvasJourneyGrid {
     this.CELLS_PER_ROW = 5;
     this.KM_PER_CELL = 20;
     this.KM_PER_ROW = 100; // 5 × 20km
-    this.CELL_SIZE = 80;
     this.CELL_PADDING = 4;
+    this.HORIZONTAL_PADDING = 30; // Extra padding on left/right to prevent arcs from touching edges
+
+    // Calculate responsive cell size
+    this.calculateCellSize();
     
     // Viewport and scrolling
     this.scrollY = 0;
@@ -35,7 +38,8 @@ export class CanvasJourneyGrid {
     this.organicPathfinder = new OrganicPathfinder(
       this.CELL_SIZE,
       this.CELL_PADDING,
-      this.CELLS_PER_ROW
+      this.CELLS_PER_ROW,
+      this.HORIZONTAL_PADDING
     );
     
     // DOM overlay for interactive nodes
@@ -47,7 +51,26 @@ export class CanvasJourneyGrid {
   init() {
     this.createCanvas();
     this.setupScrolling();
-    console.log(`🎨 Canvas journey grid: ${this.CELLS_PER_ROW} cells/row, ${this.KM_PER_CELL}km/cell`);
+    console.log(`🎨 Canvas journey grid: ${this.CELLS_PER_ROW} cells/row, ${this.KM_PER_CELL}km/cell, ${this.CELL_SIZE}px cells`);
+  }
+
+  /**
+   * Calculate responsive cell size based on viewport width
+   * Maintains square cells that fit within the screen
+   */
+  calculateCellSize() {
+    const containerWidth = this.container?.clientWidth || window.innerWidth || 500;
+
+    // Available width = containerWidth - (2 × horizontal padding) - (6 × cell padding)
+    const availableWidth = containerWidth - (2 * this.HORIZONTAL_PADDING) - ((this.CELLS_PER_ROW + 1) * this.CELL_PADDING);
+
+    // Cell size = available width divided by number of cells
+    this.CELL_SIZE = Math.floor(availableWidth / this.CELLS_PER_ROW);
+
+    // Ensure minimum size for usability
+    this.CELL_SIZE = Math.max(60, this.CELL_SIZE);
+
+    console.log(`📱 Responsive cell size: ${this.CELL_SIZE}px (container: ${containerWidth}px)`);
   }
   
   createCanvas() {
@@ -56,9 +79,8 @@ export class CanvasJourneyGrid {
     this.canvas.style.cssText = `
       display: block;
       background: #f8f9fa;
-      width: 100%;
     `;
-    
+
     this.ctx = this.canvas.getContext('2d');
     
     // Create DOM overlay for interactive nodes
@@ -92,25 +114,27 @@ export class CanvasJourneyGrid {
   
   updateCanvasSize() {
     const containerWidth = this.container.clientWidth || 500;
-    const gridWidth = (this.CELLS_PER_ROW * this.CELL_SIZE) + ((this.CELLS_PER_ROW + 1) * this.CELL_PADDING);
-    
+    const gridWidth = (this.CELLS_PER_ROW * this.CELL_SIZE) + ((this.CELLS_PER_ROW + 1) * this.CELL_PADDING) + (2 * this.HORIZONTAL_PADDING);
+
     // Calculate total height needed
     const maxCells = this.maxDistance > 0 ? Math.ceil(this.maxDistance / this.KM_PER_CELL) + 1 : 10;
     const maxRows = Math.ceil(maxCells / this.CELLS_PER_ROW);
     const totalHeight = (maxRows * this.CELL_SIZE) + ((maxRows + 1) * this.CELL_PADDING) + 100; // Extra padding
-    
-    // Set canvas dimensions
-    this.canvas.width = Math.max(gridWidth, containerWidth);
+
+    // Set canvas dimensions (maintain square aspect ratio)
+    this.canvas.width = gridWidth;
     this.canvas.height = totalHeight;
+    this.canvas.style.width = `${gridWidth}px`;
     this.canvas.style.height = `${totalHeight}px`;
-    
-    // Update overlay height to match canvas
+
+    // Update overlay to match canvas size
     if (this.nodeOverlay) {
+      this.nodeOverlay.style.width = `${gridWidth}px`;
       this.nodeOverlay.style.height = `${totalHeight}px`;
     }
-    
+
     this.viewportHeight = this.container.clientHeight;
-    
+
     console.log(`🎨 Canvas resized: ${this.canvas.width}×${this.canvas.height}px`);
   }
   
@@ -121,9 +145,12 @@ export class CanvasJourneyGrid {
       this.redraw();
     });
     
-    // Handle window resize
+    // Handle window resize with responsive cell size recalculation
     window.addEventListener('resize', () => {
+      this.calculateCellSize();
+      this.updateOrganicPathfinder(); // Update pathfinder with new cell size
       this.updateCanvasSize();
+      this.repositionAllNodes(); // Reposition nodes with new cell size
       this.redraw();
     });
   }
@@ -135,11 +162,11 @@ export class CanvasJourneyGrid {
   distanceToCoords(distance) {
     const cellIndex = Math.ceil(distance / this.KM_PER_CELL);
     const row = Math.floor(cellIndex / this.CELLS_PER_ROW);
-    
+
     // Serpentine pattern: alternate direction every row
     let col;
     const positionInRow = cellIndex % this.CELLS_PER_ROW;
-    
+
     if (row % 2 === 0) {
       // Even rows: Left to Right (normal)
       col = positionInRow;
@@ -147,11 +174,11 @@ export class CanvasJourneyGrid {
       // Odd rows: Right to Left (reversed)
       col = this.CELLS_PER_ROW - 1 - positionInRow;
     }
-    
-    // Calculate screen position
-    const x = this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
+
+    // Calculate screen position with horizontal padding
+    const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
     const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING));
-    
+
     console.log(`🐍 Serpentine: ${distance}km → cell ${cellIndex} → row ${row} (${row % 2 === 0 ? 'L→R' : 'R→L'}) → col ${col}`);
     return { row, col, cellIndex, x, y };
   }
@@ -226,7 +253,7 @@ export class CanvasJourneyGrid {
 
     for (let row = firstVisibleRow; row <= lastVisibleRow; row++) {
       for (let col = 0; col < this.CELLS_PER_ROW; col++) {
-        const x = this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
+        const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
         const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING));
 
         // Only draw if cell is in visible area
@@ -372,8 +399,8 @@ export class CanvasJourneyGrid {
    * Get center point of a cell
    */
   getCellCenter(row, col) {
-    const x = col * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_SIZE / 2;
-    const y = row * (this.CELL_SIZE + this.CELL_PADDING) + this.CELL_SIZE / 2;
+    const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
+    const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
     return { x, y };
   }
 
@@ -658,6 +685,37 @@ export class CanvasJourneyGrid {
     console.log('🧹 All canvas nodes and components cleared');
   }
   
+  /**
+   * Update OrganicPathfinder with new cell size
+   */
+  updateOrganicPathfinder() {
+    this.organicPathfinder = new OrganicPathfinder(
+      this.CELL_SIZE,
+      this.CELL_PADDING,
+      this.CELLS_PER_ROW,
+      this.HORIZONTAL_PADDING
+    );
+  }
+
+  /**
+   * Reposition all nodes with updated cell size
+   * Simply recalculates coords - nodes auto-position at cell centers
+   */
+  repositionAllNodes() {
+    this.nodes.forEach((node, distance) => {
+      // Recalculate grid coordinates with new cell size
+      node.coords = this.distanceToCoords(distance);
+
+      // Update NodeComponent position
+      const component = this.nodeComponents.get(distance);
+      if (component) {
+        const center = this.getCellCenter(node.coords.row, node.coords.col);
+        component.nodeData.coords = { x: center.x - 20, y: center.y - 20 };
+        component.updatePosition();
+      }
+    });
+  }
+
   /**
    * Get grid statistics
    */
