@@ -45,6 +45,7 @@ export class NodeComponent {
       height: 40px;
       border-radius: 50%;
       cursor: pointer;
+      pointer-events: auto;
       transition: all 0.3s ease;
       display: flex;
       align-items: center;
