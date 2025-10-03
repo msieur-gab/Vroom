@@ -66,17 +66,16 @@ export class CameraModal {
         <div class="gps-indicator"></div>
       </div>
 
-      <div class="camera-header">
-        <button class="camera-flip-btn" aria-label="Flip camera">🔄</button>
-        <button class="camera-close-btn" aria-label="Close camera">✕</button>
-      </div>
-
       <div class="camera-controls">
+        <button class="camera-flip-btn" aria-label="Flip camera">🔄</button>
+
         <button class="camera-capture-btn" aria-label="Take photo">
           <div class="capture-ring">
             <div class="capture-inner"></div>
           </div>
         </button>
+
+        <button class="camera-close-btn" aria-label="Close camera">✕</button>
       </div>
     `;
 
