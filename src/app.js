@@ -482,8 +482,12 @@ class VroomGridApp {
 
       console.log(`📸 Photo added to cluster! Total photos: ${existingNode.data.photoCount}`);
 
-      // Force grid redraw to show photo count badge
-      this.grid.redraw();
+      // Update the NodeComponent to show the new badge
+      // Find the node component and refresh its appearance
+      const nodeComponent = this.canvasGrid.nodeComponents.get(existingNode.id);
+      if (nodeComponent) {
+        nodeComponent.updateAppearance();
+      }
 
       // Success feedback
       if ('vibrate' in navigator) {
