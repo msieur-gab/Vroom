@@ -343,7 +343,7 @@ class VroomGridApp {
       // Check for clustering conditions
       const MIN_DISTANCE_METERS = 100; // 100 meters
       const MAX_TIME_GAP_MS = 30 * 60 * 1000; // 30 minutes
-      const MAX_PHOTOS_PER_CLUSTER = 9; // Nice 3x3 gallery grid
+      const MAX_PHOTOS_PER_CLUSTER = 3; // Limit to 3 photos per cluster
 
       const existingNodes = this.grid.getNodesByDistance();
       const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
@@ -363,7 +363,10 @@ class VroomGridApp {
           await this.addPhotoToExistingNode(lastNode, photoData, position);
           return;
         } else if (isCloseInSpace && isCloseInTime && !hasRoomInCluster) {
-          console.log(`📍 Cluster full (${currentPhotoCount}/${MAX_PHOTOS_PER_CLUSTER}), creating new node`);
+          // Cluster is full - reject the photo
+          console.warn(`⚠️ Cluster full (${currentPhotoCount}/${MAX_PHOTOS_PER_CLUSTER}), photo rejected`);
+          alert(`This location already has ${currentPhotoCount} photos. Please move to a new location to take more photos.`);
+          throw new Error('Cluster is full - cannot add more photos to this location');
         }
       }
 
