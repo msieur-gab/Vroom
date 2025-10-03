@@ -6,7 +6,7 @@
   },
   "content": [
     { "field": "title", "type": "header" },
-    { "field": "image", "type": "image" },
+    { "field": "fullImage", "type": "image" },
     { "field": "images", "type": "gallery" },
     { "field": "description", "type": "text" },
     { "field": "location", "type": "text", "icon": "📍" },
