@@ -1,6 +1,7 @@
 import { OrthogonalPathfinder } from './OrthogonalPathfinder.js';
 import { OrganicPathfinder } from './OrganicPathfinder.js';
 import { NodeComponent } from './NodeComponent.js';
+import { GRID_CONFIG } from '../config.js';
 
 /**
  * CanvasJourneyGrid - High-performance Canvas-based journey visualization
@@ -12,13 +13,13 @@ export class CanvasJourneyGrid {
     this.grid = grid;
     this.canvas = null;
     this.ctx = null;
-    
-    // Fixed grid configuration
-    this.CELLS_PER_ROW = 5;
-    this.KM_PER_CELL = 20;
-    this.KM_PER_ROW = 100; // 5 × 20km
-    this.CELL_PADDING = 4;
-    this.HORIZONTAL_PADDING = 30; // Extra padding on left/right to prevent arcs from touching edges
+
+    // Grid configuration from centralized config
+    this.CELLS_PER_ROW = GRID_CONFIG.CELLS_PER_ROW;
+    this.KM_PER_CELL = GRID_CONFIG.KM_PER_CELL;
+    this.KM_PER_ROW = GRID_CONFIG.KM_PER_ROW;
+    this.CELL_PADDING = GRID_CONFIG.CELL_PADDING;
+    this.HORIZONTAL_PADDING = GRID_CONFIG.HORIZONTAL_PADDING;
 
     // Calculate responsive cell size
     this.calculateCellSize();

@@ -1,3 +1,5 @@
+import { GRID_CONFIG } from '../config.js';
+
 /**
  * TravelGrid - Core grid system for travel photo positioning
  * Maps accumulated distance to grid coordinates for orthogonal path visualization
@@ -5,8 +7,8 @@
 export class TravelGrid {
   constructor(options = {}) {
     // Grid configuration
-    this.KM_PER_CELL = 20;
-    this.CELLS_PER_ROW = 5;
+    this.KM_PER_CELL = GRID_CONFIG.KM_PER_CELL;
+    this.CELLS_PER_ROW = GRID_CONFIG.CELLS_PER_ROW;
     this.CELL_SIZE = options.cellSize || 80;
     
     // Data storage

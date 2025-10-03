@@ -1,3 +1,5 @@
+import { GRID_CONFIG } from '../config.js';
+
 /**
  * PathRouter - A* pathfinding with orthogonal constraints
  * Creates clean, efficient paths between grid nodes with minimal turns
@@ -236,9 +238,9 @@ export class PathRouter {
    * @returns {{row: number, col: number}} Grid coordinates
    */
   distanceToGridCoords(distance) {
-    const KM_PER_CELL = 20;
-    const MAX_COLUMNS = 10; // Should match ResponsiveGrid
-    
+    const KM_PER_CELL = GRID_CONFIG.KM_PER_CELL;
+    const MAX_COLUMNS = GRID_CONFIG.CELLS_PER_ROW;
+
     // Same logic as ResponsiveGrid
     const cellIndex = distance === 0 ? 0 : Math.ceil(distance / KM_PER_CELL);
     const row = Math.floor(cellIndex / MAX_COLUMNS);
