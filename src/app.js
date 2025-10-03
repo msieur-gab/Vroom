@@ -322,7 +322,10 @@ class VroomGridApp {
 
     } catch (error) {
       console.error('❌ Failed to process photo:', error);
-      alert(`Failed to add photo: ${error.message}`);
+      // Don't show alert for cluster full error - toast already shown
+      if (error.message !== 'Cluster is full - cannot add more photos to this location') {
+        console.error('Unexpected error:', error.message);
+      }
 
       // Hide loading
       if (loadingOverlay) {
