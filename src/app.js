@@ -109,6 +109,36 @@ class VroomGridApp {
           fullImage: URL.createObjectURL(photo.imageData)
         }));
 
+        // Calculate visual distance for grid placement
+        // Use the same logic as window.vroom.addNode to ensure consistency
+        const { KM_PER_CELL } = this.canvasGrid;
+        const existingNodes = this.grid.getNodesByDistance();
+        const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
+
+        // Get the real cumulative distance (what's stored in DB)
+        const realDistance = etape.distance;
+
+        // Calculate visual distance based on previous node's cell position
+        let visualDistance = 0;
+        if (!lastNode) {
+          // First node always at 0
+          visualDistance = 0;
+        } else {
+          // Get trip distance (real distance traveled since last node)
+          const lastRealDistance = lastNode.data.realDistance || lastNode.distance;
+          const tripDistance = realDistance - lastRealDistance;
+
+          // Calculate cell jump
+          const lastNodeCellIndex = Math.ceil(lastNode.distance / KM_PER_CELL);
+          const cellJump = Math.ceil(tripDistance / KM_PER_CELL);
+          const newCellIndex = lastNodeCellIndex + cellJump;
+
+          // Place 1km into the target cell
+          visualDistance = newCellIndex > 0 ? ((newCellIndex - 1) * KM_PER_CELL) + 1 : 0;
+        }
+
+        console.log(`📦 Restoring: real=${realDistance}km, visual=${visualDistance}km`);
+
         // Prepare node data with image from first photo
         const nodeData = {
           ...etape,
@@ -119,16 +149,18 @@ class VroomGridApp {
           fullImage: photosWithUrls.length > 0 ? photosWithUrls[0].fullImage : null,
           location: etape.latitude && etape.longitude
             ? geolocationService.formatCoordinates(etape.latitude, etape.longitude)
-            : 'Unknown location'
+            : 'Unknown location',
+          realDistance: realDistance // Store real distance
         };
 
-        // Add étape to data grid
-        const nodeId = this.grid.addPhotoNode(etape.distance, nodeData);
+        // Add étape to data grid using VISUAL distance
+        const nodeId = this.grid.addPhotoNode(visualDistance, nodeData);
 
-        // Add to canvas grid
-        this.canvasGrid.addNode(etape.distance, {
+        // Add to canvas grid using VISUAL distance
+        this.canvasGrid.addNode(visualDistance, {
           id: nodeId,
           type: 'journey',
+          realDistance: realDistance,
           ...nodeData
         });
       }
@@ -426,10 +458,11 @@ class VroomGridApp {
         timestamp: photoData.timestamp,
         title: `Photo at ${Math.round(realCumulativeDistance)}km`,
         description: 'Journey moment captured',
-        type: 'journey'
+        type: 'journey',
+        realDistance: realCumulativeDistance // Store real distance for reload
       };
 
-      // Add node to grid
+      // Add node to grid using window.vroom.addNode (handles visual vs real distance)
       if (tripDistance === 0) {
         window.vroom.addNodeAt(0, nodeData);
       } else {
