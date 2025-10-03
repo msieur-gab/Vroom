@@ -1,10 +1,9 @@
 /**
- * CameraService - Mobile camera capture with metadata extraction
- * Handles photo capture, compression, and EXIF data extraction
+ * CameraService - Mobile camera capture with live preview
+ * Handles getUserMedia stream, photo capture, and thumbnail generation
  */
 export class CameraService {
   constructor() {
-    this.stream = null;
     this.isSupported = 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices;
   }
 
@@ -16,16 +15,81 @@ export class CameraService {
   }
 
   /**
-   * Capture photo using mobile camera
-   * Uses file input for better compatibility across devices
-   * @param {Object} options - Capture options
-   * @returns {Promise<Object>} Photo data with metadata
+   * Start camera preview stream
+   * @returns {Promise<MediaStream>} Camera stream
    */
-  async capturePhoto(options = {}) {
-    console.log('📷 Camera service: starting photo capture...');
+  async startPreview() {
+    console.log('📷 Starting camera preview...');
 
-    // Use file input approach - works on all devices
-    return this.captureFromFile();
+    if (!this.isSupported) {
+      throw new Error('Camera not supported on this device');
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Use back camera on mobile
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+
+      console.log('✅ Camera stream acquired');
+      return stream;
+    } catch (error) {
+      console.error('❌ Camera access error:', error);
+
+      if (error.name === 'NotAllowedError') {
+        throw new Error('Camera permission denied. Please enable camera access in your browser settings.');
+      } else if (error.name === 'NotFoundError') {
+        throw new Error('No camera found on this device');
+      } else {
+        throw new Error(`Camera error: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Capture photo from video stream
+   * @param {HTMLVideoElement} videoElement - Video element displaying stream
+   * @returns {Promise<Object>} Photo data with imageData and thumbnail
+   */
+  async capturePhoto(videoElement) {
+    console.log('📷 Capturing photo from stream...');
+
+    if (!videoElement || !videoElement.videoWidth) {
+      throw new Error('Invalid video element or stream not ready');
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = videoElement.videoWidth;
+    canvas.height = videoElement.videoHeight;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+
+    console.log('📷 Converting to data URL...');
+    const imageData = canvas.toDataURL('image/jpeg', 0.85);
+
+    console.log('📷 Creating thumbnail...');
+    const thumbnail = await this.createThumbnail(canvas);
+
+    const photoData = {
+      imageData,
+      thumbnail,
+      timestamp: Date.now(),
+      width: canvas.width,
+      height: canvas.height,
+      size: imageData.length
+    };
+
+    console.log('✅ Photo captured successfully:', {
+      width: photoData.width,
+      height: photoData.height
+    });
+
+    return photoData;
   }
 
   /**
@@ -48,132 +112,75 @@ export class CameraService {
   }
 
   /**
-   * Use file input for camera capture
-   * Works on all devices and opens native camera UI
+   * Stop camera stream and release resources
+   * @param {MediaStream} stream - Camera stream to stop
+   */
+  stopPreview(stream) {
+    if (stream) {
+      console.log('📷 Stopping camera stream...');
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log('📷 Track stopped:', track.kind);
+      });
+    }
+  }
+
+  /**
+   * Fallback: Use file input for camera capture (compatibility mode)
    * @returns {Promise<Object>} Photo data
    */
   async captureFromFile() {
-    console.log('📷 Opening file/camera picker...');
+    console.log('📷 Using file input fallback...');
 
     return new Promise((resolve, reject) => {
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
-      input.capture = 'environment'; // Hint to use camera on mobile
-
-      console.log('📷 File input created, triggering click...');
+      input.capture = 'environment';
 
       input.onchange = async (e) => {
-        console.log('📷 File selected, processing...');
         const file = e.target.files[0];
         if (!file) {
-          console.error('❌ No file selected');
           reject(new Error('No file selected'));
           return;
         }
 
-        console.log('📷 File info:', { name: file.name, size: file.size, type: file.type });
-
         try {
           const reader = new FileReader();
           reader.onload = async (event) => {
-            console.log('📷 File loaded, creating image...');
             const img = new Image();
             img.onload = async () => {
-              console.log('📷 Image loaded, dimensions:', img.width, 'x', img.height);
-
-              // Create canvas from image
               const canvas = document.createElement('canvas');
               canvas.width = img.width;
               canvas.height = img.height;
               const ctx = canvas.getContext('2d');
               ctx.drawImage(img, 0, 0);
 
-              console.log('📷 Converting to data URL...');
               const imageData = canvas.toDataURL('image/jpeg', 0.85);
-
-              console.log('📷 Creating thumbnail...');
               const thumbnail = await this.createThumbnail(canvas);
 
-              const photoData = {
+              resolve({
                 imageData,
                 thumbnail,
                 timestamp: Date.now(),
                 width: img.width,
                 height: img.height,
-                size: imageData.length,
-                filename: file.name
-              };
-
-              console.log('✅ Photo processed successfully:', photoData);
-              resolve(photoData);
+                size: imageData.length
+              });
             };
-
-            img.onerror = (error) => {
-              console.error('❌ Image load error:', error);
-              reject(new Error('Failed to load image'));
-            };
-
+            img.onerror = () => reject(new Error('Failed to load image'));
             img.src = event.target.result;
           };
-
-          reader.onerror = (error) => {
-            console.error('❌ FileReader error:', error);
-            reject(new Error('Failed to read file'));
-          };
-
+          reader.onerror = () => reject(new Error('Failed to read file'));
           reader.readAsDataURL(file);
         } catch (error) {
-          console.error('❌ Photo processing error:', error);
           reject(error);
         }
       };
 
-      // Handle cancel
-      input.oncancel = () => {
-        console.log('⚠️ Camera/file picker cancelled');
-        reject(new Error('Photo capture cancelled'));
-      };
-
-      // Trigger file picker
+      input.oncancel = () => reject(new Error('Photo capture cancelled'));
       input.click();
-      console.log('📷 File picker triggered');
     });
-  }
-
-  /**
-   * Show camera preview (for future enhancement)
-   */
-  async showPreview(containerElement) {
-    if (!this.isSupported) {
-      throw new Error('Camera not supported');
-    }
-
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }
-    });
-
-    const video = document.createElement('video');
-    video.srcObject = stream;
-    video.setAttribute('playsinline', true);
-    video.style.width = '100%';
-    video.style.height = 'auto';
-
-    containerElement.appendChild(video);
-    await video.play();
-
-    this.stream = stream;
-    return video;
-  }
-
-  /**
-   * Stop camera preview
-   */
-  stopPreview() {
-    if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
-      this.stream = null;
-    }
   }
 }
 

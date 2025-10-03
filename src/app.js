@@ -6,7 +6,7 @@ import { TravelGrid } from './core/TravelGrid.js';
 import { PathRouter } from './core/PathRouter.js';
 import { CanvasJourneyGrid } from './ui/CanvasJourneyGrid.js';
 import { MilestoneEngine } from './core/MilestoneEngine.js';
-import { cameraService } from './services/camera.js';
+import { cameraModal } from './ui/CameraModal.js';
 import { geolocationService } from './services/geolocation.js';
 import { databaseService } from './services/database.js';
 
@@ -213,6 +213,9 @@ class VroomGridApp {
       console.error('❌ Camera button not found');
     }
 
+    // Listen for photo-captured event from CameraModal
+    document.addEventListener('photo-captured', (e) => this.handlePhotoCaptured(e.detail));
+
     // Settings button - could set home position
     const settingsBtn = document.getElementById('settings-btn');
     if (settingsBtn) {
@@ -224,10 +227,25 @@ class VroomGridApp {
   }
 
   /**
-   * Handle photo capture
+   * Handle photo capture - opens camera modal
    */
   async handleTakePhoto() {
-    console.log('📸 Take photo button clicked!');
+    console.log('📸 Take photo button clicked - opening camera modal');
+
+    try {
+      await cameraModal.open();
+    } catch (error) {
+      console.error('❌ Failed to open camera:', error);
+      alert(error.message || 'Failed to open camera. Please check permissions.');
+    }
+  }
+
+  /**
+   * Handle photo captured event from CameraModal
+   * @param {Object} captureData - Photo data with GPS position
+   */
+  async handlePhotoCaptured(captureData) {
+    console.log('✅ Photo captured event received:', captureData);
 
     const loadingOverlay = document.getElementById('loading-overlay');
     const loadingText = loadingOverlay?.querySelector('.loading-text');
@@ -236,68 +254,151 @@ class VroomGridApp {
       // Show loading
       if (loadingOverlay) {
         loadingOverlay.classList.remove('hidden');
-        if (loadingText) loadingText.textContent = 'Accessing camera...';
+        if (loadingText) loadingText.textContent = 'Processing photo...';
       }
 
-      console.log('📷 Requesting camera access...');
-      // Capture photo
-      const photoData = await cameraService.capturePhoto();
-      console.log('✅ Photo captured:', photoData);
-
-      if (loadingText) loadingText.textContent = 'Getting location...';
-
-      // Get current location
-      const position = await geolocationService.getCurrentPosition();
-      console.log('✅ Position acquired:', position);
+      const { imageData, thumbnail, gpsPosition, hasGPS } = captureData;
 
       // Calculate distance traveled since last photo
       let tripDistance = 0;
       const lastPos = geolocationService.lastPosition;
 
-      console.log('🔍 Checking last position:', lastPos);
-      console.log('🔍 Current position:', position);
+      console.log('🔍 Last position:', lastPos);
+      console.log('🔍 GPS position:', gpsPosition);
 
-      if (!lastPos) {
-        // First photo - set as home and starting point
-        geolocationService.setHomePosition(position);
-        geolocationService.lastPosition = position;
+      if (!hasGPS || !gpsPosition) {
+        console.warn('⚠️ No GPS position available, using distance 0');
         tripDistance = 0;
-        console.log('🏠 First photo! Home position set:', position);
+
+        // Set home position if this is first photo and we have GPS
+        if (!lastPos && gpsPosition) {
+          geolocationService.setHomePosition(gpsPosition);
+          geolocationService.lastPosition = gpsPosition;
+        }
+      } else if (!lastPos) {
+        // First photo - set as home and starting point
+        geolocationService.setHomePosition(gpsPosition);
+        geolocationService.lastPosition = gpsPosition;
+        tripDistance = 0;
+        console.log('🏠 First photo! Home position set:', gpsPosition);
       } else {
-        // Calculate distance from last photo using the position we just got
+        // Calculate distance from last photo
         tripDistance = geolocationService.calculateDistance(
           lastPos.latitude,
           lastPos.longitude,
-          position.latitude,
-          position.longitude
+          gpsPosition.latitude,
+          gpsPosition.longitude
         );
-        console.log(`📏 Distance from last photo: (${lastPos.latitude},${lastPos.longitude}) → (${position.latitude},${position.longitude}) = ${tripDistance.toFixed(2)}km`);
+        console.log(`📏 Distance from last photo: ${tripDistance.toFixed(2)}km`);
 
         // Update last position for next photo
-        geolocationService.lastPosition = position;
+        geolocationService.lastPosition = gpsPosition;
       }
 
       console.log('✅ Distance calculated:', tripDistance, 'km');
 
+      // Add photo to journey immediately (no preview modal)
+      await this.addPhotoToJourney({
+        imageData,
+        thumbnail,
+        timestamp: captureData.timestamp,
+        width: captureData.width,
+        height: captureData.height
+      }, gpsPosition, tripDistance);
+
       // Hide loading
       if (loadingOverlay) {
         loadingOverlay.classList.add('hidden');
       }
-
-      console.log('🎬 About to show preview modal...');
-      // Show preview modal
-      this.showPhotoPreview(photoData, position, tripDistance);
-      console.log('✅ showPhotoPreview called');
 
     } catch (error) {
-      console.error('❌ Photo capture failed:', error);
-      console.error('Error stack:', error.stack);
-      alert(`Failed to capture photo: ${error.message}`);
+      console.error('❌ Failed to process photo:', error);
+      alert(`Failed to add photo: ${error.message}`);
 
       // Hide loading
       if (loadingOverlay) {
         loadingOverlay.classList.add('hidden');
       }
+    }
+  }
+
+  /**
+   * Add photo to journey (saves to DB and adds to grid)
+   * @param {Object} photoData - Photo image data
+   * @param {Object} position - GPS position
+   * @param {number} tripDistance - Distance traveled since last photo
+   */
+  async addPhotoToJourney(photoData, position, tripDistance) {
+    console.log('💾 Adding photo to journey...');
+
+    try {
+      // Calculate cumulative distance
+      const existingNodes = this.grid.getNodesByDistance();
+      const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
+      const lastRealDistance = lastNode ? (lastNode.data.realDistance || lastNode.distance) : 0;
+      const realCumulativeDistance = lastRealDistance + tripDistance;
+
+      // Save étape to database first
+      const etapeId = await databaseService.saveEtape({
+        distance: realCumulativeDistance,
+        timestamp: photoData.timestamp,
+        coords: {
+          latitude: position.latitude,
+          longitude: position.longitude,
+          accuracy: position.accuracy
+        },
+        title: `Étape at ${Math.round(realCumulativeDistance)}km`,
+        notes: null,
+        metadata: {}
+      });
+
+      console.log(`💾 Étape saved with ID: ${etapeId}`);
+
+      // Save photo to database (linked to étape)
+      const photoId = await databaseService.savePhoto(etapeId, {
+        timestamp: photoData.timestamp,
+        imageData: photoData.imageData,
+        thumbnail: photoData.thumbnail,
+        width: photoData.width,
+        height: photoData.height
+      });
+
+      console.log(`💾 Photo saved with ID: ${photoId}`);
+
+      // Add node with photo and location data to grid
+      const nodeData = {
+        etapeId: etapeId,
+        photoId: photoId,
+        image: photoData.thumbnail,
+        fullImage: photoData.imageData,
+        location: geolocationService.formatCoordinates(position.latitude, position.longitude),
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy,
+        timestamp: photoData.timestamp,
+        title: `Photo at ${Math.round(realCumulativeDistance)}km`,
+        description: 'Journey moment captured',
+        type: 'journey'
+      };
+
+      // Add node to grid
+      if (tripDistance === 0) {
+        window.vroom.addNodeAt(0, nodeData);
+      } else {
+        window.vroom.addNode(tripDistance, nodeData);
+      }
+
+      // Success feedback
+      console.log(`📸 Photo added! Trip distance: ${tripDistance.toFixed(2)}km`);
+
+      // Vibrate if supported
+      if ('vibrate' in navigator) {
+        navigator.vibrate(200);
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to save photo:', error);
+      throw error;
     }
   }
 
