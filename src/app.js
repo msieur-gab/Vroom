@@ -332,9 +332,29 @@ class VroomGridApp {
     console.log('💾 Adding photo to journey...');
 
     try {
-      // Calculate cumulative distance
+      // Check for clustering conditions
+      const MIN_DISTANCE_METERS = 100; // 100 meters
+      const MAX_TIME_GAP_MS = 30 * 60 * 1000; // 30 minutes
+
       const existingNodes = this.grid.getNodesByDistance();
       const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
+
+      // Check if we should cluster this photo with the last node
+      if (lastNode && lastNode.data && lastNode.data.type === 'journey') {
+        const timeSinceLastPhoto = photoData.timestamp - lastNode.data.timestamp;
+        const distanceInMeters = tripDistance * 1000; // Convert km to meters
+
+        const isCloseInSpace = distanceInMeters < MIN_DISTANCE_METERS;
+        const isCloseInTime = timeSinceLastPhoto < MAX_TIME_GAP_MS;
+
+        if (isCloseInSpace && isCloseInTime) {
+          console.log(`📍 Clustering photo with last node (${distanceInMeters.toFixed(0)}m, ${Math.round(timeSinceLastPhoto/1000)}s apart)`);
+          await this.addPhotoToExistingNode(lastNode, photoData, position);
+          return;
+        }
+      }
+
+      // Calculate cumulative distance
       const lastRealDistance = lastNode ? (lastNode.data.realDistance || lastNode.distance) : 0;
       const realCumulativeDistance = lastRealDistance + tripDistance;
 
@@ -403,6 +423,67 @@ class VroomGridApp {
 
     } catch (error) {
       console.error('❌ Failed to save photo:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Add photo to existing node (clustering)
+   * @param {Object} existingNode - The node to append the photo to
+   * @param {Object} photoData - Photo blob data
+   * @param {Object} position - GPS position
+   */
+  async addPhotoToExistingNode(existingNode, photoData, position) {
+    console.log('📸 Adding photo to existing node:', existingNode.data.etapeId);
+
+    try {
+      // Save photo to database under the same étape
+      const photoId = await databaseService.savePhoto(existingNode.data.etapeId, {
+        timestamp: photoData.timestamp,
+        imageBlob: photoData.imageBlob,
+        thumbnailBlob: photoData.thumbnailBlob,
+        width: photoData.width,
+        height: photoData.height,
+        format: photoData.format || 'webp'
+      });
+
+      console.log(`💾 Additional photo saved with ID: ${photoId}`);
+
+      // Convert blobs to Object URLs
+      const imageURL = URL.createObjectURL(photoData.imageBlob);
+      const thumbnailURL = URL.createObjectURL(photoData.thumbnailBlob);
+
+      // Initialize photos array if it doesn't exist
+      if (!existingNode.data.photos) {
+        existingNode.data.photos = [{
+          id: existingNode.data.photoId,
+          image: existingNode.data.image,
+          fullImage: existingNode.data.fullImage
+        }];
+      }
+
+      // Add new photo to photos array
+      existingNode.data.photos.push({
+        id: photoId,
+        image: thumbnailURL,
+        fullImage: imageURL
+      });
+
+      // Update node data
+      existingNode.data.photoCount = existingNode.data.photos.length;
+
+      console.log(`📸 Photo added to cluster! Total photos: ${existingNode.data.photoCount}`);
+
+      // Force grid redraw to show photo count badge
+      this.grid.redraw();
+
+      // Success feedback
+      if ('vibrate' in navigator) {
+        navigator.vibrate(200);
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to add photo to existing node:', error);
       throw error;
     }
   }

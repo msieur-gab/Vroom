@@ -82,17 +82,49 @@ export class NodeComponent {
    */
   updateAppearance() {
     if (!this.schema) return;
-    
+
     const display = this.schema.display;
-    
+
     // Apply schema styling
     this.element.style.backgroundColor = display.color;
     this.element.style.width = display.size;
     this.element.style.height = display.size;
-    
+
+    // Clear previous content
+    this.element.innerHTML = '';
+
     // Set display text from schema
-    this.element.textContent = display.icon;
-    
+    const iconSpan = document.createElement('span');
+    iconSpan.textContent = display.icon;
+    iconSpan.style.position = 'relative';
+    this.element.appendChild(iconSpan);
+
+    // Add photo count badge if multiple photos
+    if (this.nodeData.data && this.nodeData.data.photoCount > 1) {
+      const badge = document.createElement('div');
+      badge.className = 'photo-count-badge';
+      badge.textContent = this.nodeData.data.photoCount;
+      badge.style.cssText = `
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #FF9800;
+        color: white;
+        font-size: 10px;
+        font-weight: bold;
+        border-radius: 10px;
+        min-width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        border: 2px solid white;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+      `;
+      this.element.appendChild(badge);
+    }
+
     // Add type indicator
     this.element.setAttribute('data-type', this.nodeData.type);
     this.element.setAttribute('data-distance', this.nodeData.distance);
@@ -290,9 +322,19 @@ export class NodeComponent {
    */
   generateModalContent() {
     if (!this.schema) return '<p>No schema available</p>';
-    
+
     const { distance, data = {} } = this.nodeData;
-    
+
+    // Prepare photo data
+    const preparedData = { ...data };
+
+    // If there are multiple photos, prepare images array for gallery
+    if (data.photos && data.photos.length > 0) {
+      preparedData.images = data.photos.map(photo => photo.fullImage);
+      // Use first photo as the main image
+      preparedData.fullImage = data.photos[0].fullImage;
+    }
+
     let content = `
       <div class="modal-header">
         <h2>${this.schema.modal.title}</h2>
@@ -300,15 +342,26 @@ export class NodeComponent {
       </div>
       <div class="modal-content">
     `;
-    
+
     // Generate content from schema
     this.schema.content.forEach(field => {
-      const value = data[field.field];
+      const value = preparedData[field.field];
+
+      // Skip single fullImage if we have a gallery
+      if (field.field === 'fullImage' && preparedData.images && preparedData.images.length > 1) {
+        return;
+      }
+
+      // Skip gallery if we only have one photo
+      if (field.field === 'images' && (!preparedData.images || preparedData.images.length <= 1)) {
+        return;
+      }
+
       if (value) {
         content += this.renderField(field, value);
       }
     });
-    
+
     content += '</div>';
     return content;
   }
@@ -326,8 +379,8 @@ export class NodeComponent {
       case 'image':
         return `<img src="${value}" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 8px; margin: 8px 0;">`;
       case 'gallery':
-        return Array.isArray(value) ? 
-          `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px; margin: 8px 0;">${value.map(img => `<img src="${img}" style="width: 100%; height: 80px; object-fit: cover; border-radius: 4px;">`).join('')}</div>` : '';
+        return Array.isArray(value) ?
+          `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 8px 0;">${value.map(img => `<img src="${img}" style="width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; cursor: pointer;">`).join('')}</div>` : '';
       case 'tags':
         return Array.isArray(value) ? 
           `<div>${value.map(tag => `<span style="background: #f0f0f0; padding: 4px 8px; border-radius: 12px; font-size: 12px; margin: 2px;">${tag}</span>`).join(' ')}</div>` : '';
