@@ -1,3 +1,5 @@
+import { imageConverter } from './ImageConverter.js';
+
 /**
  * CameraService - Mobile camera capture with live preview
  * Handles getUserMedia stream, photo capture, and thumbnail generation
@@ -29,8 +31,8 @@ export class CameraService {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment', // Use back camera on mobile
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: 4096 },    // Request 4K for maximum quality
+          height: { ideal: 4096 }    // Square high-res for cropping
         },
         audio: false
       });
@@ -69,7 +71,9 @@ export class CameraService {
     const offsetX = (sourceWidth - size) / 2;
     const offsetY = (sourceHeight - size) / 2;
 
-    // Create square canvas
+    console.log(`📐 Capturing at ${sourceWidth}x${sourceHeight}, cropping to ${size}x${size}`);
+
+    // Create square canvas at full resolution
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
@@ -83,11 +87,16 @@ export class CameraService {
       0, 0, size, size                // Destination
     );
 
-    console.log('📷 Converting to WebP blob...');
-    const imageBlob = await this.canvasToBlob(canvas, 'image/webp', 0.92);
+    // Convert to optimal format using ImageConverter
+    console.log('📷 Converting to optimal format...');
+    const { blob: imageBlob, format } = await imageConverter.convertToOptimalFormat(canvas, {
+      preset: 'full'
+    });
 
     console.log('📷 Creating thumbnail...');
-    const thumbnailBlob = await this.createThumbnail(canvas);
+    const { blob: thumbnailBlob } = await imageConverter.convertToOptimalFormat(canvas, {
+      preset: 'thumbnail'
+    });
 
     const photoData = {
       imageBlob,
@@ -96,7 +105,7 @@ export class CameraService {
       width: size,
       height: size,
       size: imageBlob.size,
-      format: 'webp'
+      format: format
     };
 
     console.log('✅ Photo captured successfully:', {
@@ -107,48 +116,6 @@ export class CameraService {
     });
 
     return photoData;
-  }
-
-  /**
-   * Convert canvas to blob
-   * @param {HTMLCanvasElement} canvas - Source canvas
-   * @param {string} mimeType - Image MIME type
-   * @param {number} quality - Quality 0-1
-   * @returns {Promise<Blob>} Image blob
-   */
-  async canvasToBlob(canvas, mimeType = 'image/webp', quality = 0.92) {
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            resolve(blob);
-          } else {
-            reject(new Error('Failed to create blob from canvas'));
-          }
-        },
-        mimeType,
-        quality
-      );
-    });
-  }
-
-  /**
-   * Create thumbnail from canvas
-   * @param {HTMLCanvasElement} canvas - Source canvas
-   * @returns {Promise<Blob>} Thumbnail blob
-   */
-  async createThumbnail(canvas) {
-    const thumbnailCanvas = document.createElement('canvas');
-    const maxSize = 200;
-
-    const scale = Math.min(maxSize / canvas.width, maxSize / canvas.height);
-    thumbnailCanvas.width = canvas.width * scale;
-    thumbnailCanvas.height = canvas.height * scale;
-
-    const ctx = thumbnailCanvas.getContext('2d');
-    ctx.drawImage(canvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
-
-    return this.canvasToBlob(thumbnailCanvas, 'image/webp', 0.85);
   }
 
   /**
@@ -203,8 +170,13 @@ export class CameraService {
               // Draw square crop
               ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
 
-              const imageBlob = await this.canvasToBlob(canvas, 'image/webp', 0.92);
-              const thumbnailBlob = await this.createThumbnail(canvas);
+              // Convert using ImageConverter
+              const { blob: imageBlob, format } = await imageConverter.convertToOptimalFormat(canvas, {
+                preset: 'full'
+              });
+              const { blob: thumbnailBlob } = await imageConverter.convertToOptimalFormat(canvas, {
+                preset: 'thumbnail'
+              });
 
               resolve({
                 imageBlob,
@@ -213,7 +185,7 @@ export class CameraService {
                 width: size,
                 height: size,
                 size: imageBlob.size,
-                format: 'webp'
+                format: format
               });
             };
             img.onerror = () => reject(new Error('Failed to load image'));

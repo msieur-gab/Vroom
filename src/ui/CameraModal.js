@@ -118,8 +118,8 @@ export class CameraModal {
       this.stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: this.facingMode,
-          width: { ideal: 1920 },
-          height: { ideal: 1920 }  // Request square-ish for better crop
+          width: { ideal: 4096 },    // Request 4K for maximum quality
+          height: { ideal: 4096 }    // Square high-res for cropping
         },
         audio: false
       });
