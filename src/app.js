@@ -101,13 +101,21 @@ class VroomGridApp {
           }
         }
 
+        // Convert photo blobs to Object URLs for display
+        const photosWithUrls = photos.map(photo => ({
+          id: photo.id,
+          image: URL.createObjectURL(photo.thumbnail),
+          fullImage: URL.createObjectURL(photo.imageData)
+        }));
+
         // Prepare node data with image from first photo
         const nodeData = {
           ...etape,
-          photos: photos,
+          photos: photosWithUrls,
+          photoCount: photos.length,
           type: 'journey',
-          image: photos.length > 0 ? URL.createObjectURL(photos[0].thumbnail) : null,
-          fullImage: photos.length > 0 ? URL.createObjectURL(photos[0].imageData) : null,
+          image: photosWithUrls.length > 0 ? photosWithUrls[0].image : null,
+          fullImage: photosWithUrls.length > 0 ? photosWithUrls[0].fullImage : null,
           location: etape.latitude && etape.longitude
             ? geolocationService.formatCoordinates(etape.latitude, etape.longitude)
             : 'Unknown location'
