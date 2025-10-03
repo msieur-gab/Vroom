@@ -33,11 +33,8 @@ export class OrganicPathfinder {
 
     const path = new Path2D();
 
-    console.log(`🎨 Creating path through ${waypoints.length} waypoints`);
-
     // Start at first waypoint
     path.moveTo(waypoints[0].x, waypoints[0].y);
-    console.log(`  Start at (${waypoints[0].x.toFixed(1)}, ${waypoints[0].y.toFixed(1)})`);
 
     // Create smooth curves through all waypoints
     for (let i = 0; i < waypoints.length - 1; i++) {
@@ -50,10 +47,8 @@ export class OrganicPathfinder {
       const isUTurn = this.isRowTransition(curr, next);
 
       if (isUTurn) {
-        console.log(`  U-turn from row ${curr.row} to ${next.row}`);
         this.addUTurnCurve(path, curr, next, prev, nextNext);
       } else {
-        console.log(`  Straight from (${curr.x.toFixed(1)}, ${curr.y.toFixed(1)}) to (${next.x.toFixed(1)}, ${next.y.toFixed(1)})`);
         this.addSmoothSegment(path, curr, next, prev, nextNext);
       }
     }
