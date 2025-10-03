@@ -442,13 +442,11 @@ class VroomGridApp {
    * @param {Object} position - GPS position
    */
   async addPhotoToExistingNode(existingNode, photoData, position) {
-    console.log('📸 Adding photo to existing node:', existingNode);
-    console.log('📸 existingNode.data:', existingNode.data);
+    console.log('📸 Adding photo to existing node at distance:', existingNode.distance);
 
     try {
       // existingNode.data.id is the etapeId from database
       const etapeId = existingNode.data.id;
-      console.log('📸 etapeId:', etapeId, 'type:', typeof etapeId);
 
       // Save photo to database under the same étape
       const photoId = await databaseService.savePhoto(etapeId, {
@@ -485,7 +483,6 @@ class VroomGridApp {
       if (nodeComponent) {
         nodeComponent.nodeData.data = existingNode.data;
         nodeComponent.updateAppearance();
-        console.log(`🔄 Badge updated to show ${photosWithUrls.length} photos`);
       }
 
       // Success feedback
