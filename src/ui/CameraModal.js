@@ -63,28 +63,20 @@ export class CameraModal {
     container.innerHTML = `
       <div class="camera-preview">
         <video class="camera-video" autoplay playsinline></video>
+        <div class="gps-indicator"></div>
       </div>
 
-      <div class="camera-overlay">
-        <div class="camera-header">
-          <button class="camera-flip-btn" aria-label="Flip camera">🔄</button>
-          <button class="camera-close-btn" aria-label="Close camera">✕</button>
-        </div>
+      <div class="camera-header">
+        <button class="camera-flip-btn" aria-label="Flip camera">🔄</button>
+        <button class="camera-close-btn" aria-label="Close camera">✕</button>
+      </div>
 
-        <div class="camera-controls">
-          <div class="gps-status">
-            <span class="gps-icon">📍</span>
-            <span class="gps-text">Acquiring GPS...</span>
+      <div class="camera-controls">
+        <button class="camera-capture-btn" aria-label="Take photo">
+          <div class="capture-ring">
+            <div class="capture-inner"></div>
           </div>
-
-          <button class="camera-capture-btn" aria-label="Take photo">
-            <div class="capture-ring">
-              <div class="capture-inner"></div>
-            </div>
-          </button>
-
-          <div class="camera-spacer"></div>
-        </div>
+        </button>
       </div>
     `;
 
@@ -169,23 +161,23 @@ export class CameraModal {
     console.log('📍 Acquiring GPS position...');
     this.gpsAcquiring = true;
 
-    const gpsStatus = document.querySelector('.gps-status');
+    const gpsIndicator = document.querySelector('.gps-indicator');
 
     try {
       this.gpsPosition = await geolocationService.getCurrentPosition();
 
-      if (gpsStatus) {
-        gpsStatus.querySelector('.gps-text').textContent = 'GPS Ready';
-        gpsStatus.classList.add('gps-ready');
+      if (gpsIndicator) {
+        gpsIndicator.classList.remove('gps-acquiring');
+        gpsIndicator.classList.add('gps-ready');
       }
 
       console.log('✅ GPS position acquired:', this.gpsPosition);
     } catch (error) {
       console.warn('⚠️ GPS acquisition failed:', error);
 
-      if (gpsStatus) {
-        gpsStatus.querySelector('.gps-text').textContent = 'GPS unavailable';
-        gpsStatus.classList.add('gps-error');
+      if (gpsIndicator) {
+        gpsIndicator.classList.remove('gps-acquiring');
+        gpsIndicator.classList.add('gps-error');
       }
     } finally {
       this.gpsAcquiring = false;
