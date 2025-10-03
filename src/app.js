@@ -8,6 +8,7 @@ import { CanvasJourneyGrid } from './ui/CanvasJourneyGrid.js';
 import { MilestoneEngine } from './core/MilestoneEngine.js';
 import { cameraService } from './services/camera.js';
 import { geolocationService } from './services/geolocation.js';
+import { databaseService } from './services/database.js';
 
 class VroomGridApp {
   constructor() {
@@ -21,12 +22,15 @@ class VroomGridApp {
   
   async init() {
     console.log('🗺️ Initializing Vroom Grid...');
-    
+
+    // Initialize database first
+    await databaseService.init();
+
     // Initialize core systems
     this.grid = new TravelGrid();
     this.pathRouter = new PathRouter(this.grid);
     this.milestoneEngine = new MilestoneEngine();
-    
+
     // Setup canvas journey grid
     const gridContainer = document.querySelector('.grid-container');
     if (gridContainer) {
@@ -36,13 +40,16 @@ class VroomGridApp {
       console.error('❌ Grid container not found');
       return;
     }
-    
+
+    // Load existing journey from database
+    await this.loadJourney();
+
     // Setup UI event handlers
     this.setupUIHandlers();
-    
+
     // Expose testing methods to window for dev console access
     this.exposeTestingMethods();
-    
+
     console.log('🚀 Vroom Grid initialized successfully!');
     console.log('');
     console.log('🧪 Testing methods available:');
@@ -56,6 +63,143 @@ class VroomGridApp {
     console.log('Example: window.vroom.addNode(25) adds 25km to your journey!');
   }
   
+  /**
+   * Load existing journey from database
+   */
+  async loadJourney() {
+    console.log('📂 Loading journey from database...');
+
+    try {
+      // Load all étapes with their photos
+      console.log('🔍 Step 1: Loading étapes...');
+      const etapes = await databaseService.getAllEtapes();
+      console.log('✅ Étapes loaded:', etapes);
+
+      console.log('🔍 Step 2: Loading milestones...');
+      const milestones = await databaseService.getAllMilestones();
+      console.log('✅ Milestones loaded:', milestones);
+
+      if (etapes.length === 0 && milestones.length === 0) {
+        console.log('📭 No existing journey data found');
+        return;
+      }
+
+      console.log(`📦 Found ${etapes.length} étapes and ${milestones.length} milestones`);
+
+      // Restore étapes to grid
+      for (const etape of etapes) {
+        console.log('📦 Restoring étape:', etape);
+
+        // Load photos for this étape (only if etape has an id)
+        let photos = [];
+        if (etape.id) {
+          try {
+            photos = await databaseService.getPhotosForEtape(etape.id);
+            console.log(`📷 Loaded ${photos.length} photos for étape ${etape.id}`);
+          } catch (error) {
+            console.error(`❌ Failed to load photos for étape ${etape.id}:`, error);
+          }
+        }
+
+        // Prepare node data with image from first photo
+        const nodeData = {
+          ...etape,
+          photos: photos,
+          type: 'journey',
+          // Use first photo's data for node display
+          image: photos.length > 0 ? photos[0].thumbnail : null,
+          fullImage: photos.length > 0 ? photos[0].imageData : null,
+          location: etape.latitude && etape.longitude
+            ? geolocationService.formatCoordinates(etape.latitude, etape.longitude)
+            : 'Unknown location'
+        };
+
+        // Add étape to data grid
+        const nodeId = this.grid.addPhotoNode(etape.distance, nodeData);
+
+        // Add to canvas grid
+        this.canvasGrid.addNode(etape.distance, {
+          id: nodeId,
+          type: 'journey',
+          ...nodeData
+        });
+      }
+
+      // Restore milestones to grid
+      for (const milestone of milestones) {
+        console.log('🏆 Restoring milestone:', milestone);
+
+        // Mark milestone as unlocked in engine
+        this.milestoneEngine.unlockMilestone(milestone.distance);
+
+        // Use a tiny offset for visual distance to prevent overlap
+        const visualDistance = milestone.distance > 0 ? milestone.distance - 0.01 : 0;
+
+        // Prepare milestone data with schema-compatible fields
+        const milestoneData = {
+          ...milestone,
+          isMilestone: true,
+          achievement: `${milestone.icon} ${milestone.title}`,
+          description: milestone.description,
+          celebration: `You've traveled ${milestone.distance}km!`,
+          totalDistance: milestone.distance,
+          timeElapsed: Math.floor(milestone.distance / 20),
+          badgeEarned: `${milestone.icon} ${milestone.title}`,
+          title: milestone.title
+        };
+
+        // Don't spread milestoneData as it contains 'type' field which conflicts
+        const nodeId = this.grid.addPhotoNode(visualDistance, milestoneData);
+
+        const canvasNodeId = this.canvasGrid.addNode(visualDistance, {
+          id: nodeId,
+          type: 'milestone',  // Force type to be 'milestone', not milestone.type
+          ...milestoneData,
+          type: 'milestone'   // Override again after spread to ensure it stays 'milestone'
+        });
+
+        console.log(`✅ Milestone restored at ${visualDistance}km (canvas ID: ${canvasNodeId})`);
+      }
+
+      // Restore geolocation state from last étape
+      if (etapes.length > 0) {
+        const lastEtape = etapes[etapes.length - 1];
+        if (lastEtape.latitude && lastEtape.longitude) {
+          geolocationService.lastPosition = {
+            latitude: lastEtape.latitude,
+            longitude: lastEtape.longitude,
+            timestamp: lastEtape.timestamp
+          };
+          console.log('📍 Restored last position from database');
+        }
+
+        // Set home position from first étape
+        const firstEtape = etapes[0];
+        if (firstEtape.latitude && firstEtape.longitude) {
+          geolocationService.homePosition = {
+            latitude: firstEtape.latitude,
+            longitude: firstEtape.longitude,
+            timestamp: firstEtape.timestamp
+          };
+          console.log('🏠 Restored home position from database');
+        }
+      }
+
+      // Update stats
+      console.log('🔍 Step 3: Getting stats...');
+      const stats = await databaseService.getStats();
+      console.log('✅ Stats loaded:', stats);
+
+      this.updateStats(stats.maxDistance);
+
+      console.log('✅ Journey loaded successfully');
+    } catch (error) {
+      console.error('❌ Failed to load journey:', error);
+      console.error('Error details:', error.message);
+      console.error('Stack trace:', error.stack);
+    }
+  }
+
   /**
    * Setup UI button handlers
    */
@@ -203,38 +347,80 @@ class VroomGridApp {
     modal.classList.remove('hidden');
 
     // Handle accept
-    const handleAccept = () => {
-      // Add node with photo and location data
-      const nodeData = {
-        image: photoData.thumbnail,
-        fullImage: photoData.imageData,
-        location: geolocationService.formatCoordinates(position.latitude, position.longitude),
-        latitude: position.latitude,
-        longitude: position.longitude,
-        accuracy: position.accuracy,
-        timestamp: photoData.timestamp,
-        title: `Photo at ${Math.round(tripDistance)}km`,
-        description: 'Journey moment captured',
-        type: 'journey'
-      };
+    const handleAccept = async () => {
+      try {
+        // Calculate cumulative distance
+        const existingNodes = this.grid.getNodesByDistance();
+        const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
+        const lastRealDistance = lastNode ? (lastNode.data.realDistance || lastNode.distance) : 0;
+        const realCumulativeDistance = lastRealDistance + tripDistance;
 
-      // Add node to grid
-      if (tripDistance === 0) {
-        window.vroom.addNodeAt(0, nodeData);
-      } else {
-        window.vroom.addNode(tripDistance, nodeData);
+        // Save étape to database first
+        const etapeId = await databaseService.saveEtape({
+          distance: realCumulativeDistance,
+          timestamp: photoData.timestamp,
+          coords: {
+            latitude: position.latitude,
+            longitude: position.longitude,
+            accuracy: position.accuracy
+          },
+          title: `Étape at ${Math.round(realCumulativeDistance)}km`,
+          notes: null,
+          metadata: {}
+        });
+
+        console.log(`💾 Étape saved with ID: ${etapeId}`);
+
+        // Save photo to database (linked to étape)
+        const photoId = await databaseService.savePhoto(etapeId, {
+          timestamp: photoData.timestamp,
+          imageData: photoData.imageData,
+          thumbnail: photoData.thumbnail,
+          width: photoData.width,
+          height: photoData.height,
+          size: photoData.size,
+          filename: photoData.filename
+        });
+
+        console.log(`💾 Photo saved with ID: ${photoId}`);
+
+        // Add node with photo and location data to grid
+        const nodeData = {
+          etapeId: etapeId,
+          photoId: photoId,
+          image: photoData.thumbnail,
+          fullImage: photoData.imageData,
+          location: geolocationService.formatCoordinates(position.latitude, position.longitude),
+          latitude: position.latitude,
+          longitude: position.longitude,
+          accuracy: position.accuracy,
+          timestamp: photoData.timestamp,
+          title: `Photo at ${Math.round(realCumulativeDistance)}km`,
+          description: 'Journey moment captured',
+          type: 'journey'
+        };
+
+        // Add node to grid
+        if (tripDistance === 0) {
+          window.vroom.addNodeAt(0, nodeData);
+        } else {
+          window.vroom.addNode(tripDistance, nodeData);
+        }
+
+        // Success feedback
+        console.log(`📸 Photo added! Trip distance: ${tripDistance.toFixed(2)}km`);
+
+        // Vibrate if supported
+        if ('vibrate' in navigator) {
+          navigator.vibrate(200);
+        }
+
+        // Close modal
+        closeModal();
+      } catch (error) {
+        console.error('❌ Failed to save photo:', error);
+        alert(`Failed to save photo: ${error.message}`);
       }
-
-      // Success feedback
-      console.log(`📸 Photo added! Trip distance: ${tripDistance.toFixed(2)}km`);
-
-      // Vibrate if supported
-      if ('vibrate' in navigator) {
-        navigator.vibrate(200);
-      }
-
-      // Close modal
-      closeModal();
     };
 
     // Handle reject (retake)
@@ -342,13 +528,20 @@ class VroomGridApp {
       },
       
       // Clear all data
-      clear: () => {
+      clear: async () => {
         console.log('🧹 Clearing all data...');
+
+        // Clear database
+        await databaseService.clearJourney();
+
+        // Clear in-memory data
         this.grid.clear();
         this.canvasGrid.clearNodes(); // Clear canvas nodes
         this.milestoneEngine.reset(); // Reset achievements
         geolocationService.reset();   // Reset geolocation (clears lastPosition and homePosition)
         this.updateStats(0);          // Reset statistics to 0
+
+        console.log('✅ All data cleared (memory + database)');
       },
       
       // Create a sample journey for testing
@@ -552,7 +745,36 @@ class VroomGridApp {
         window.vroom.addRewardNode(150, { name: 'Speed Demon', rarity: 'epic' });
         window.vroom.addCheckpointNode(200, { title: 'Rest Stop', status: 'active' });
         console.log('✅ Interactive nodes created! Click on them to see the modals.');
-      }
+      },
+
+      // Database utilities
+      exportDB: async () => {
+        const data = await databaseService.exportData();
+        console.log('📦 Database export:', data);
+        return data;
+      },
+
+      importDB: async (data) => {
+        await databaseService.importData(data);
+        console.log('✅ Database imported, reloading journey...');
+        await this.loadJourney();
+      },
+
+      dbStats: async () => {
+        const stats = await databaseService.getStats();
+        console.log('📊 Database stats:', stats);
+        return stats;
+      },
+
+      deleteDB: async () => {
+        if (confirm('⚠️ Delete entire database? This cannot be undone!')) {
+          await databaseService.deleteDatabase();
+          console.log('✅ Database deleted. Reload page to start fresh.');
+        }
+      },
+
+      // Direct database access for debugging
+      db: databaseService
     };
     
     console.log('🔧 Testing methods exposed to window.vroom');
@@ -580,7 +802,7 @@ class VroomGridApp {
    * Adds a special milestone node to the grid.
    * @param {object} milestone - The milestone object from MilestoneEngine.
    */
-  addMilestoneNode(milestone) {
+  async addMilestoneNode(milestone) {
     console.log(`🎨 Adding milestone node: ${milestone.name} at ${milestone.distance}km`);
 
     // Use a tiny offset for the distance to prevent overwriting a user node at the exact same location in the canvas map.
@@ -598,6 +820,25 @@ class VroomGridApp {
       badgeEarned: `${milestone.icon} ${milestone.name}`,
       title: milestone.name
     };
+
+    // Save milestone to database
+    try {
+      const exists = await databaseService.milestoneExists(milestone.distance);
+      if (!exists) {
+        await databaseService.saveMilestone({
+          type: milestone.id,
+          distance: milestone.distance,
+          title: milestone.name,
+          description: milestone.description,
+          icon: milestone.icon,
+          unlocked: true,
+          metadata: milestone
+        });
+        console.log(`💾 Milestone saved to database: ${milestone.name}`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to save milestone:', error);
+    }
 
     // Add to data grid (TravelGrid)
     const nodeId = this.grid.addPhotoNode(visualDistance, milestoneData);

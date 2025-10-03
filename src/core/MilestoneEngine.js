@@ -138,6 +138,18 @@ export class MilestoneEngine {
   isMilestoneUnlocked(milestoneId) {
     return this.unlockedMilestones.has(milestoneId);
   }
+
+  /**
+   * Manually unlock a milestone (for database restore)
+   * @param {number} distance - Milestone distance to unlock
+   */
+  unlockMilestone(distance) {
+    const milestone = this.milestones.find(m => m.distance === distance);
+    if (milestone && !this.unlockedMilestones.has(milestone.id)) {
+      this.unlockedMilestones.add(milestone.id);
+      console.log(`🔓 Milestone restored: ${milestone.name} (${milestone.distance}km)`);
+    }
+  }
   
   /**
    * Get total count of unlocked milestones

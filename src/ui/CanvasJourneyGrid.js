@@ -1,4 +1,5 @@
 import { OrthogonalPathfinder } from './OrthogonalPathfinder.js';
+import { OrganicPathfinder } from './OrganicPathfinder.js';
 import { NodeComponent } from './NodeComponent.js';
 
 /**
@@ -16,8 +17,11 @@ export class CanvasJourneyGrid {
     this.CELLS_PER_ROW = 5;
     this.KM_PER_CELL = 20;
     this.KM_PER_ROW = 100; // 5 × 20km
-    this.CELL_SIZE = 80;
     this.CELL_PADDING = 4;
+    this.HORIZONTAL_PADDING = 30; // Extra padding on left/right to prevent arcs from touching edges
+
+    // Calculate responsive cell size
+    this.calculateCellSize();
     
     // Viewport and scrolling
     this.scrollY = 0;
@@ -28,8 +32,15 @@ export class CanvasJourneyGrid {
     this.nodeComponents = new Map(); // distance -> NodeComponent instances
     this.maxDistance = 0;
     
-    // Pathfinding
-    this.pathfinder = new OrthogonalPathfinder();
+    // Pathfinding - toggle between styles
+    this.useOrganicPaths = true; // Set to false for orthogonal paths
+    this.orthogonalPathfinder = new OrthogonalPathfinder();
+    this.organicPathfinder = new OrganicPathfinder(
+      this.CELL_SIZE,
+      this.CELL_PADDING,
+      this.CELLS_PER_ROW,
+      this.HORIZONTAL_PADDING
+    );
     
     // DOM overlay for interactive nodes
     this.nodeOverlay = null;
@@ -40,7 +51,26 @@ export class CanvasJourneyGrid {
   init() {
     this.createCanvas();
     this.setupScrolling();
-    console.log(`🎨 Canvas journey grid: ${this.CELLS_PER_ROW} cells/row, ${this.KM_PER_CELL}km/cell`);
+    console.log(`🎨 Canvas journey grid: ${this.CELLS_PER_ROW} cells/row, ${this.KM_PER_CELL}km/cell, ${this.CELL_SIZE}px cells`);
+  }
+
+  /**
+   * Calculate responsive cell size based on viewport width
+   * Maintains square cells that fit within the screen
+   */
+  calculateCellSize() {
+    const containerWidth = this.container?.clientWidth || window.innerWidth || 500;
+
+    // Available width = containerWidth - (2 × horizontal padding) - (6 × cell padding)
+    const availableWidth = containerWidth - (2 * this.HORIZONTAL_PADDING) - ((this.CELLS_PER_ROW + 1) * this.CELL_PADDING);
+
+    // Cell size = available width divided by number of cells
+    this.CELL_SIZE = Math.floor(availableWidth / this.CELLS_PER_ROW);
+
+    // Ensure minimum size for usability
+    this.CELL_SIZE = Math.max(60, this.CELL_SIZE);
+
+    console.log(`📱 Responsive cell size: ${this.CELL_SIZE}px (container: ${containerWidth}px)`);
   }
   
   createCanvas() {
@@ -49,9 +79,8 @@ export class CanvasJourneyGrid {
     this.canvas.style.cssText = `
       display: block;
       background: #f8f9fa;
-      width: 100%;
     `;
-    
+
     this.ctx = this.canvas.getContext('2d');
     
     // Create DOM overlay for interactive nodes
@@ -85,25 +114,27 @@ export class CanvasJourneyGrid {
   
   updateCanvasSize() {
     const containerWidth = this.container.clientWidth || 500;
-    const gridWidth = (this.CELLS_PER_ROW * this.CELL_SIZE) + ((this.CELLS_PER_ROW + 1) * this.CELL_PADDING);
-    
+    const gridWidth = (this.CELLS_PER_ROW * this.CELL_SIZE) + ((this.CELLS_PER_ROW + 1) * this.CELL_PADDING) + (2 * this.HORIZONTAL_PADDING);
+
     // Calculate total height needed
     const maxCells = this.maxDistance > 0 ? Math.ceil(this.maxDistance / this.KM_PER_CELL) + 1 : 10;
     const maxRows = Math.ceil(maxCells / this.CELLS_PER_ROW);
     const totalHeight = (maxRows * this.CELL_SIZE) + ((maxRows + 1) * this.CELL_PADDING) + 100; // Extra padding
-    
-    // Set canvas dimensions
-    this.canvas.width = Math.max(gridWidth, containerWidth);
+
+    // Set canvas dimensions (maintain square aspect ratio)
+    this.canvas.width = gridWidth;
     this.canvas.height = totalHeight;
+    this.canvas.style.width = `${gridWidth}px`;
     this.canvas.style.height = `${totalHeight}px`;
-    
-    // Update overlay height to match canvas
+
+    // Update overlay to match canvas size
     if (this.nodeOverlay) {
+      this.nodeOverlay.style.width = `${gridWidth}px`;
       this.nodeOverlay.style.height = `${totalHeight}px`;
     }
-    
+
     this.viewportHeight = this.container.clientHeight;
-    
+
     console.log(`🎨 Canvas resized: ${this.canvas.width}×${this.canvas.height}px`);
   }
   
@@ -114,9 +145,12 @@ export class CanvasJourneyGrid {
       this.redraw();
     });
     
-    // Handle window resize
+    // Handle window resize with responsive cell size recalculation
     window.addEventListener('resize', () => {
+      this.calculateCellSize();
+      this.updateOrganicPathfinder(); // Update pathfinder with new cell size
       this.updateCanvasSize();
+      this.repositionAllNodes(); // Reposition nodes with new cell size
       this.redraw();
     });
   }
@@ -128,11 +162,11 @@ export class CanvasJourneyGrid {
   distanceToCoords(distance) {
     const cellIndex = Math.ceil(distance / this.KM_PER_CELL);
     const row = Math.floor(cellIndex / this.CELLS_PER_ROW);
-    
+
     // Serpentine pattern: alternate direction every row
     let col;
     const positionInRow = cellIndex % this.CELLS_PER_ROW;
-    
+
     if (row % 2 === 0) {
       // Even rows: Left to Right (normal)
       col = positionInRow;
@@ -140,11 +174,11 @@ export class CanvasJourneyGrid {
       // Odd rows: Right to Left (reversed)
       col = this.CELLS_PER_ROW - 1 - positionInRow;
     }
-    
-    // Calculate screen position
-    const x = this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
+
+    // Calculate screen position with horizontal padding
+    const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
     const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING));
-    
+
     console.log(`🐍 Serpentine: ${distance}km → cell ${cellIndex} → row ${row} (${row % 2 === 0 ? 'L→R' : 'R→L'}) → col ${col}`);
     return { row, col, cellIndex, x, y };
   }
@@ -219,7 +253,7 @@ export class CanvasJourneyGrid {
 
     for (let row = firstVisibleRow; row <= lastVisibleRow; row++) {
       for (let col = 0; col < this.CELLS_PER_ROW; col++) {
-        const x = this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
+        const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
         const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING));
 
         // Only draw if cell is in visible area
@@ -232,43 +266,152 @@ export class CanvasJourneyGrid {
   }
   
   /**
+   * Calculate serpentine cell index from row/col coordinates
+   * This gives us the proper ordering for serpentine traversal
+   */
+  getSerpentineCellIndex(row, col) {
+    const cellsPerRow = this.CELLS_PER_ROW;
+    const isEvenRow = row % 2 === 0;
+
+    // Even rows go left-to-right (0,1,2,3,4)
+    // Odd rows go right-to-left (4,3,2,1,0)
+    const colInSerpentine = isEvenRow ? col : (cellsPerRow - 1 - col);
+
+    // Cell index = row * cellsPerRow + column position in that row
+    return row * cellsPerRow + colInSerpentine;
+  }
+
+  /**
    * Draw orthogonal roads using grid-based pathfinding
    */
   drawRoads(visibleTop, visibleBottom) {
+    // Sort nodes in SERPENTINE ORDER, not by distance!
     const sortedNodes = Array.from(this.nodes.values())
-      .sort((a, b) => a.distance - b.distance);
-    
+      .sort((a, b) => {
+        // Calculate serpentine cell index for proper ordering
+        const cellA = this.getSerpentineCellIndex(a.coords.row, a.coords.col);
+        const cellB = this.getSerpentineCellIndex(b.coords.row, b.coords.col);
+        return cellA - cellB;
+      });
+
     if (sortedNodes.length < 2) return;
-    
+
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
-    
-    // Draw orthogonal paths between consecutive nodes
+
+    // Use organic or orthogonal paths based on setting
+    if (this.useOrganicPaths) {
+      // Generate waypoints for debugging
+      const waypoints = this.organicPathfinder.generateOrganicWaypoints(sortedNodes);
+
+      // Draw the organic path
+      const organicPath = this.organicPathfinder.createOrganicSerpentinePath(sortedNodes);
+      this.drawOrganicPath(organicPath);
+
+      // DEBUG: Draw red dots at waypoints
+      this.drawWaypointDebug(waypoints);
+    } else {
+      // Generate complete serpentine path with waypoints
+      const fullPath = this.generateFullSerpentinePath(sortedNodes);
+      console.log(`🛣️ Drawing full serpentine path through ${fullPath.length} waypoints`);
+
+      // Draw the complete path
+      if (fullPath && fullPath.length > 1) {
+        this.drawOrthogonalPath(fullPath, false);
+      }
+    }
+  }
+
+  /**
+   * Generate complete serpentine path including waypoints at row ends
+   */
+  generateFullSerpentinePath(sortedNodes) {
+    if (sortedNodes.length === 0) return [];
+
+    const waypoints = [];
+    const firstNode = sortedNodes[0];
+    const lastNode = sortedNodes[sortedNodes.length - 1];
+
+    // Start at first node
+    waypoints.push(this.getNodeCenter(firstNode));
+
+    // For each pair of consecutive nodes, fill in the serpentine path
     for (let i = 0; i < sortedNodes.length - 1; i++) {
       const fromNode = sortedNodes[i];
       const toNode = sortedNodes[i + 1];
-      
-      // Determine connection sides based on serpentine pattern
-      const { fromSide, toSide } = this.getConnectionSides(fromNode, toNode);
-      
-      // Convert nodes to bounds format for pathfinder
-      const fromBounds = this.nodeToBounds(fromNode);
-      const toBounds = this.nodeToBounds(toNode);
-      
-      // Check if path is visible
-      const minY = Math.min(fromBounds.top, toBounds.top);
-      const maxY = Math.max(fromBounds.bottom, toBounds.bottom);
-      
-      if (maxY >= visibleTop - 100 && minY <= visibleBottom + 100) {
-        // Find orthogonal path with correct connection sides
-        const path = this.pathfinder.findPathWithSides(fromBounds, toBounds, fromSide, toSide);
 
-        // Draw the path with rounded corners
-        if (path && path.length > 1) {
-          this.drawOrthogonalPath(path, i === 0); // First path has dashed center line
-        }
-      }
+      // Add intermediate waypoints for the serpentine flow
+      const intermediates = this.getSerpentineWaypoints(fromNode, toNode);
+      waypoints.push(...intermediates);
+
+      // Add the next node
+      waypoints.push(this.getNodeCenter(toNode));
     }
+
+    return waypoints;
+  }
+
+  /**
+   * Get serpentine waypoints between two nodes
+   */
+  getSerpentineWaypoints(fromNode, toNode) {
+    const waypoints = [];
+    const fromRow = fromNode.coords.row;
+    const toRow = toNode.coords.row;
+    const fromCol = fromNode.coords.col;
+    const toCol = toNode.coords.col;
+
+    // Same row - no waypoints needed
+    if (fromRow === toRow) {
+      return waypoints;
+    }
+
+    // Different rows - need to traverse serpentine pattern
+    const isFromEvenRow = fromRow % 2 === 0;
+
+    // Add waypoint at end of fromNode's row
+    const fromRowEndCol = isFromEvenRow ? 4 : 0;
+    if (fromCol !== fromRowEndCol) {
+      waypoints.push(this.getCellCenter(fromRow, fromRowEndCol));
+    }
+
+    // Add waypoints for each intermediate row
+    for (let row = fromRow + 1; row < toRow; row++) {
+      const isEvenRow = row % 2 === 0;
+      const startCol = isEvenRow ? 0 : 4;
+      const endCol = isEvenRow ? 4 : 0;
+
+      waypoints.push(this.getCellCenter(row, startCol));
+      waypoints.push(this.getCellCenter(row, endCol));
+    }
+
+    // Add waypoint at start of toNode's row
+    const isToEvenRow = toRow % 2 === 0;
+    const toRowStartCol = isToEvenRow ? 0 : 4;
+    if (toCol !== toRowStartCol) {
+      waypoints.push(this.getCellCenter(toRow, toRowStartCol));
+    }
+
+    return waypoints;
+  }
+
+  /**
+   * Get center point of a cell
+   */
+  getCellCenter(row, col) {
+    const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
+    const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
+    return { x, y };
+  }
+
+  /**
+   * Get center point of a node
+   */
+  getNodeCenter(node) {
+    return {
+      x: node.coords.x + this.CELL_SIZE / 2,
+      y: node.coords.y + this.CELL_SIZE / 2
+    };
   }
   
   /**
@@ -344,6 +487,56 @@ export class CanvasJourneyGrid {
     };
   }
   
+  /**
+   * Draw organic curved path
+   */
+  drawOrganicPath(path2d) {
+    const ctx = this.ctx;
+
+    // Draw road layers for depth (doubled thickness)
+    // Shadow layer
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 16;
+    ctx.globalAlpha = 0.3;
+    ctx.stroke(path2d);
+
+    // Main road surface
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 12;
+    ctx.globalAlpha = 1.0;
+    ctx.stroke(path2d);
+
+    // Center line (optional)
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.5;
+    ctx.stroke(path2d);
+
+    ctx.globalAlpha = 1.0;
+  }
+
+  /**
+   * DEBUG: Draw red dots at waypoints
+   */
+  drawWaypointDebug(waypoints) {
+    const ctx = this.ctx;
+    ctx.fillStyle = 'red';
+    ctx.globalAlpha = 1.0;
+
+    waypoints.forEach((wp, index) => {
+      // Draw red dot
+      ctx.beginPath();
+      ctx.arc(wp.x, wp.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw waypoint number
+      ctx.fillStyle = 'white';
+      ctx.font = '10px monospace';
+      ctx.fillText(index, wp.x + 6, wp.y - 6);
+      ctx.fillStyle = 'red';
+    });
+  }
+
   /**
    * Draw orthogonal path with rounded corners
    */
@@ -492,6 +685,37 @@ export class CanvasJourneyGrid {
     console.log('🧹 All canvas nodes and components cleared');
   }
   
+  /**
+   * Update OrganicPathfinder with new cell size
+   */
+  updateOrganicPathfinder() {
+    this.organicPathfinder = new OrganicPathfinder(
+      this.CELL_SIZE,
+      this.CELL_PADDING,
+      this.CELLS_PER_ROW,
+      this.HORIZONTAL_PADDING
+    );
+  }
+
+  /**
+   * Reposition all nodes with updated cell size
+   * Simply recalculates coords - nodes auto-position at cell centers
+   */
+  repositionAllNodes() {
+    this.nodes.forEach((node, distance) => {
+      // Recalculate grid coordinates with new cell size
+      node.coords = this.distanceToCoords(distance);
+
+      // Update NodeComponent position
+      const component = this.nodeComponents.get(distance);
+      if (component) {
+        const center = this.getCellCenter(node.coords.row, node.coords.col);
+        component.nodeData.coords = { x: center.x - 20, y: center.y - 20 };
+        component.updatePosition();
+      }
+    });
+  }
+
   /**
    * Get grid statistics
    */

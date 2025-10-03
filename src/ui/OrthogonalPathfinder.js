@@ -38,53 +38,53 @@ export class OrthogonalPathfinder {
    * Create simple 3-point orthogonal path based on connection sides
    */
   createSimpleOrthogonalPath(startPoint, endPoint, fromSide, toSide) {
-    // Create smooth serpentine curves like in road.png
-    const gap = Math.abs(endPoint.y - startPoint.y);
-    const curveRadius = Math.min(gap * 0.3, 40); // Adaptive radius based on distance
-    
-    // For right→left: create rounded downward-right curve
+    const dx = endPoint.x - startPoint.x;
+    const dy = endPoint.y - startPoint.y;
+
+    // Same row - horizontal connection
+    if (Math.abs(dy) < 10) {
+      return [startPoint, endPoint];
+    }
+
+    // For right→left: U-turn on the right
     if (fromSide === 'right' && toSide === 'left') {
-      const extendX = Math.max(startPoint.x, endPoint.x) + curveRadius;
-      const midY = (startPoint.y + endPoint.y) / 2;
-      
+      const turnX = Math.max(startPoint.x, endPoint.x) + 40;
       return [
         startPoint,
-        { x: extendX, y: startPoint.y },           // Extend right
-        { x: extendX, y: startPoint.y + curveRadius }, // Start curve down
-        { x: extendX, y: midY - curveRadius },     // Approach middle
-        { x: extendX, y: midY },                   // Middle point
-        { x: extendX, y: midY + curveRadius },     // Continue down
-        { x: endPoint.x + curveRadius, y: endPoint.y }, // Approach end
-        endPoint
+        { x: turnX, y: startPoint.y },    // Go right
+        { x: turnX, y: endPoint.y },      // Go down
+        endPoint                           // Go left to end
       ];
     }
-    
-    // For left→right: create rounded downward-left curve
+
+    // For left→right: U-turn on the left
     if (fromSide === 'left' && toSide === 'right') {
-      const extendX = Math.min(startPoint.x, endPoint.x) - curveRadius;
-      const midY = (startPoint.y + endPoint.y) / 2;
-      
+      const turnX = Math.min(startPoint.x, endPoint.x) - 40;
       return [
         startPoint,
-        { x: extendX, y: startPoint.y },           // Extend left
-        { x: extendX, y: startPoint.y + curveRadius }, // Start curve down
-        { x: extendX, y: midY - curveRadius },     // Approach middle
-        { x: extendX, y: midY },                   // Middle point
-        { x: extendX, y: midY + curveRadius },     // Continue down
-        { x: endPoint.x - curveRadius, y: endPoint.y }, // Approach end
-        endPoint
+        { x: turnX, y: startPoint.y },    // Go left
+        { x: turnX, y: endPoint.y },      // Go down
+        endPoint                           // Go right to end
       ];
     }
-    
-    // For same-side connections: traditional serpentine curve
-    const midX = (startPoint.x + endPoint.x) / 2;
+
+    // For same-side vertical connections (left→left or right→right)
+    // Simple vertical then horizontal
+    if (fromSide === toSide) {
+      return [
+        startPoint,
+        { x: startPoint.x, y: endPoint.y },  // Go down (keeping same X)
+        endPoint                              // Then horizontal to end
+      ];
+    }
+
+    // Default: L-shape
     const midY = (startPoint.y + endPoint.y) / 2;
-    
     return [
       startPoint,
-      { x: startPoint.x, y: midY },
-      { x: endPoint.x, y: midY },
-      endPoint
+      { x: startPoint.x, y: midY },       // Vertical first
+      { x: endPoint.x, y: midY },         // Horizontal
+      endPoint                             // Vertical to end
     ];
   }
 

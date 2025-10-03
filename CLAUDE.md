@@ -11,7 +11,8 @@ Vroom Grid is a mobile-first Progressive Web Application that transforms travel 
 - **Grid-based positioning**: Distance determines cell position (20km per cell, 5 cells per row = 100km per row)
 - **Serpentine path pattern**: Alternating left-to-right and right-to-left flow per row (like reading ancient Greek)
 - **Canvas rendering**: High-performance scrolling with viewport culling for thousands of nodes
-- **Orthogonal pathfinding**: A* algorithm with turn penalties to create clean, flowchart-style roads
+- **Responsive grid**: Dynamic cell sizing adapts to any mobile screen size (min 60px)
+- **Organic pathfinding**: Smooth semicircular U-turns using compass method for natural road flow
 - **Distance-based milestones**: Achievement system unlocks badges at specific kilometer thresholds
 
 ## Development Commands
@@ -62,10 +63,11 @@ window.vroom.debug()
 
 ### Core Technology Stack
 - **Frontend**: Vanilla JavaScript ES6 modules (no framework)
-- **Graphics**: HTML5 Canvas for high-performance rendering
+- **Graphics**: HTML5 Canvas with responsive grid rendering
 - **Data Storage**: In-memory (Map/Set) - no persistence layer yet
-- **Pathfinding**: Custom A* implementation with orthogonal constraints
+- **Pathfinding**: Organic semicircular U-turns using Canvas arc() API and compass geometry
 - **PWA Features**: Geolocation API for GPS tracking, Camera API for photo capture, Haversine distance calculations
+- **UI Components**: Singleton modal system for memory efficiency
 
 ### Project Structure
 ```
@@ -73,15 +75,15 @@ vroom-grid/
 ├── src/
 │   ├── core/                    # Business logic
 │   │   ├── TravelGrid.js        # Grid coordinate system & data storage
-│   │   ├── PathRouter.js        # A* pathfinding with orthogonal constraints
 │   │   └── MilestoneEngine.js   # Achievement tracking system
 │   ├── services/                # Device API integrations
 │   │   ├── camera.js            # Photo capture service (file input approach)
 │   │   └── geolocation.js       # GPS tracking & Haversine distance calculations
 │   ├── ui/                      # Rendering & interaction
-│   │   ├── CanvasJourneyGrid.js # Main Canvas renderer with serpentine layout
-│   │   ├── OrthogonalPathfinder.js # Pathfinding for road visualization
-│   │   └── NodeComponent.js     # Interactive node overlays with schema-driven modals
+│   │   ├── CanvasJourneyGrid.js # Main Canvas renderer with responsive grid & serpentine layout
+│   │   ├── OrganicPathfinder.js # Smooth semicircular pathfinding for road visualization
+│   │   ├── NodeComponent.js     # Interactive node overlays with schema-driven modals
+│   │   └── Modal.js             # Reusable modal component (singleton)
 │   ├── schemas/                 # JSON schemas for different node types
 │   │   ├── journey.json         # Photo node schema
 │   │   ├── milestone.json       # Achievement schema
@@ -89,8 +91,7 @@ vroom-grid/
 │   │   └── checkpoint.json      # Checkpoint schema
 │   └── app.js                   # Main application controller
 ├── styles/
-│   ├── main.css                 # Base styles with photo preview modal
-│   └── grid.css                 # Grid-specific styling
+│   └── main.css                 # Complete styles with modal, photo preview, and responsive design
 ├── index.html                   # Entry point with photo preview UI
 └── node-prototype.html          # Node interaction prototype
 ```
@@ -125,17 +126,32 @@ The system maintains TWO distance values (`app.js:76-109`):
 
 This separation prevents rounding errors from accumulating over many photos.
 
-### Road Rendering with Orthogonal Pathfinding
+### Road Rendering with Organic Pathfinding
 
-**Connection side logic** (`CanvasJourneyGrid.js:352-406`):
-- Same row connections: Follow row direction (L→R or R→L)
-- Row transitions: Connect from row-end to next-row-start based on serpentine flow
+**Smooth serpentine paths** using semicircular U-turns (`OrganicPathfinder.js`):
+- **Compass method**: Semicircle center at midpoint between entry/exit, radius = distance/2
+- **Waypoint strategy**: Nodes and waypoints positioned at cell centers (not edges)
+- **Arc cells**: Cells 0 (leftmost) and 4 (rightmost) reserved for U-turn arcs
+- **Horizontal padding**: 30px prevents arc overflow beyond canvas edges
 
-**Path generation** (`PathRouter.js:18-80`):
-- A* algorithm with Manhattan distance heuristic
-- Turn penalties (+1 cost) to minimize zigzag paths
-- Straight line bonus (-0.5 cost) to prefer continuous paths
-- Only orthogonal movement (no diagonals)
+**Waypoint generation** (`OrganicPathfinder.js:146-207`):
+- Same row: Direct connection between cell centers
+- Row transitions: Add waypoints at arc cell centers (cell 0 or 4)
+- Intermediate rows: Entry and exit waypoints for complete serpentine flow
+- Left-aligned grid (no centering) for predictable positioning
+
+**U-turn rendering** (`OrganicPathfinder.js:83-119`):
+```javascript
+// Compass method for perfect semicircles
+const dx = next.x - curr.x;
+const dy = next.y - curr.y;
+const radius = Math.sqrt(dx*dx + dy*dy) / 2;  // Half the diagonal distance
+const centerX = (curr.x + next.x) / 2;         // Midpoint
+const centerY = (curr.y + next.y) / 2;
+
+// Draw arc (clockwise for right turns, counter-clockwise for left)
+path.arc(centerX, centerY, radius, startAngle, endAngle, clockwise);
+```
 
 ### Milestone System
 
@@ -144,6 +160,21 @@ This separation prevents rounding errors from accumulating over many photos.
 - Checked after each node addition (`app.js:354-366`)
 - Milestones create special visual nodes on the grid
 
+### Responsive Grid System
+
+**Dynamic cell sizing** (`CanvasJourneyGrid.js:97-123`):
+- Calculates optimal cell size based on screen width
+- Minimum 60px, maximum 80px per cell
+- Formula: `(screenWidth - 2*HORIZONTAL_PADDING - 6*CELL_PADDING) / 5`
+- Horizontal padding (30px) prevents U-turn arcs from overflowing
+- Left-aligned grid (no centering) for consistent arc geometry
+
+**Benefits**:
+- Works on any mobile screen size (320px - 428px+)
+- Larger cells on tablets for better touch targets
+- Maintains 5 cells per row for serpentine pattern
+- Arc geometry automatically adjusts to cell size
+
 ### Canvas Rendering with Viewport Culling
 
 **Performance optimization** (`CanvasJourneyGrid.js:189-207`):
@@ -151,6 +182,7 @@ This separation prevents rounding errors from accumulating over many photos.
 - 100px buffer above/below viewport for smooth scrolling
 - Dynamic canvas height based on maximum distance
 - Automatic redraw on scroll and resize events
+- Recalculates cell size on window resize for responsive layout
 
 **Node types** with distinct visual styling:
 - `start`: Gold node at journey beginning
@@ -166,11 +198,28 @@ This separation prevents rounding errors from accumulating over many photos.
 - Schema-driven content rendering from `src/schemas/`
 - Both journey and milestone nodes are interactive
 
-**Schema-driven modals** (`NodeComponent.js:22-34`, `339-364`):
+**Reusable Modal System** (`Modal.js`):
+- Singleton pattern - one modal instance reused across entire app
+- DOM structure created once, content swapped for each display
+- Automatic cleanup and animation handling
+- API usage:
+```javascript
+Modal.show({
+  title: 'Node Details',
+  content: '<div>HTML content</div>',  // or HTMLElement
+  width: '500px',
+  maxHeight: '80vh',
+  onClose: () => console.log('modal closed')
+});
+Modal.hide();  // Programmatic close
+```
+
+**Schema-driven modals** (`NodeComponent.js:22-34`, `289-349`):
 - Each node type loads its own JSON schema from `src/schemas/`
 - Schema defines icon, color, modal title, and content fields
 - Field types include: header, image, gallery, tags, stat, status, rarity, list, date
 - Content dynamically generated based on schema field definitions
+- NodeComponent uses Modal.show() to display schema-rendered content
 
 ### Camera Integration
 
@@ -229,15 +278,20 @@ Always use the appropriate converter methods to move between systems.
 These are **tightly coupled** across multiple files - changing one requires updating all:
 - `KM_PER_CELL`: 20km (distance per grid cell)
 - `CELLS_PER_ROW`: 5 cells (defines serpentine width)
-- `CELL_SIZE`: 80px (visual size on canvas)
+- `CELL_SIZE`: 60-80px (dynamic responsive sizing, max 80px)
 - `CELL_PADDING`: 4px (spacing between cells)
+- `HORIZONTAL_PADDING`: 30px (prevents U-turn arc overflow)
 
-Located in: `TravelGrid.js:8-9`, `CanvasJourneyGrid.js:16-20`, `PathRouter.js:239-240`
+Located in: `TravelGrid.js:8-9`, `CanvasJourneyGrid.js:16-24`, `OrganicPathfinder.js:15-19`
 
 ### Serpentine Row Transitions
-The most complex logic is determining connection sides during row transitions.
-Key insight: Even rows (L→R) connect from RIGHT side, odd rows (R→L) connect from LEFT side.
-See `CanvasJourneyGrid.js:352-406` for full logic.
+The key to smooth U-turns is positioning waypoints at **cell centers** in arc cells:
+- **Even rows (L→R)**: Exit from cell 4 center, U-turn through cell 4, enter cell 0 center (next row)
+- **Odd rows (R→L)**: Exit from cell 0 center, U-turn through cell 0, enter cell 4 center (next row)
+- Arc geometry automatically perfect because waypoints define entry/exit points
+- No manual edge calculations needed - compass method handles everything
+
+See `OrganicPathfinder.js:83-119` for U-turn arc rendering, `OrganicPathfinder.js:146-207` for waypoint generation.
 
 ## Data Flow
 
@@ -265,7 +319,7 @@ Convert distance → grid coords (serpentine)
     ↓
 Create interactive NodeComponent with schema (NodeComponent.js)
     ↓
-Render canvas with roads (orthogonal pathfinding)
+Render canvas with roads (organic pathfinding with semicircular U-turns)
     ↓
 Check milestones (core/MilestoneEngine.js)
     ↓
@@ -286,7 +340,7 @@ Add to CanvasJourneyGrid (ui/CanvasJourneyGrid.js)
     ↓
 Convert distance → grid coords (serpentine)
     ↓
-Render canvas with roads (orthogonal pathfinding)
+Render canvas with roads (organic pathfinding with semicircular U-turns)
     ↓
 Check milestones (core/MilestoneEngine.js)
     ↓
@@ -303,13 +357,15 @@ Update stats display
 
 ### Modifying Grid Layout
 - Update `KM_PER_CELL` or `CELLS_PER_ROW` constants
-- **MUST update in all three files**: `TravelGrid.js`, `CanvasJourneyGrid.js`, `PathRouter.js`
+- **MUST update in all three files**: `TravelGrid.js`, `CanvasJourneyGrid.js`, `OrganicPathfinder.js`
+- Responsive grid will auto-adjust cell size (60-80px range)
 - Test thoroughly with `window.vroom.testCells()`
 
 ### Debugging Road Rendering
-- Check console for `🛣️ Path` and `🐍 Serpentine` debug logs
-- Use `window.vroom.showStats()` to verify grid configuration
-- Inspect connection sides with path logging in `drawRoads()`
+- Check console for `🎨 Creating path through N waypoints` debug logs
+- Use `window.vroom.showStats()` to verify grid configuration and cell size
+- Inspect U-turn geometry with logs showing start/end angles and radius
+- Verify waypoints are at cell centers (not edges) for smooth arcs
 
 ### Testing Photo Capture & GPS
 - Use Chrome DevTools → Sensors → Location override for GPS testing
