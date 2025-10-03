@@ -1,3 +1,5 @@
+import Modal from './Modal.js';
+
 /**
  * NodeComponent - Simple schema-driven interactive node
  */
@@ -6,9 +8,8 @@ export class NodeComponent {
     this.nodeData = nodeData;
     this.container = container;
     this.element = null;
-    this.modal = null;
     this.schema = null;
-    
+
     this.init();
   }
   
@@ -179,12 +180,12 @@ export class NodeComponent {
    */
   collapse() {
     this.isExpanded = false;
-    
-    if (this.modal) {
-      this.hideModal();
-    } else {
-      this.hideInlineExpansion();
-    }
+
+    // Hide the reusable modal
+    Modal.hide();
+
+    // Also hide inline expansion if present
+    this.hideInlineExpansion();
   }
   
   /**
@@ -246,80 +247,28 @@ export class NodeComponent {
   }
   
   /**
-   * Show modal with detailed information
+   * Show modal with detailed information using reusable Modal component
    */
   showModal() {
-    this.modal = document.createElement('div');
-    this.modal.className = 'node-modal';
-    this.modal.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0,0,0,0.8);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      animation: fadeIn 0.3s ease;
-    `;
-    
-    const modalContent = document.createElement('div');
-    modalContent.className = 'node-modal-content';
-    modalContent.style.cssText = `
-      background: white;
-      border-radius: 12px;
-      padding: 24px;
-      max-width: 500px;
-      max-height: 80vh;
-      overflow-y: auto;
-      position: relative;
-      animation: slideIn 0.3s ease;
-    `;
-    
-    modalContent.innerHTML = this.generateModalContent();
-    this.modal.appendChild(modalContent);
-    
-    // Close button
-    const closeButton = document.createElement('button');
-    closeButton.textContent = '×';
-    closeButton.style.cssText = `
-      position: absolute;
-      top: 12px;
-      right: 12px;
-      background: none;
-      border: none;
-      font-size: 24px;
-      cursor: pointer;
-      color: #666;
-    `;
-    closeButton.addEventListener('click', () => this.collapse());
-    modalContent.appendChild(closeButton);
-    
-    // Close on backdrop click
-    this.modal.addEventListener('click', (e) => {
-      if (e.target === this.modal) {
-        this.collapse();
-      }
-    });
-    
-    document.body.appendChild(this.modal);
-    
     // Keep node highlighted
     this.element.style.transform = 'scale(1.1)';
     this.element.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
+
+    // Show modal with generated content
+    Modal.show({
+      title: this.schema?.modal?.title || 'Node Details',
+      content: this.generateModalContent(),
+      width: this.schema?.modal?.width || '500px',
+      maxHeight: '80vh',
+      onClose: () => this.onModalClose()
+    });
   }
-  
+
   /**
-   * Hide modal
+   * Handle modal close
    */
-  hideModal() {
-    if (this.modal) {
-      this.modal.remove();
-      this.modal = null;
-    }
-    
+  onModalClose() {
+    // Reset node highlight
     this.element.style.transform = 'scale(1)';
     this.element.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
   }
@@ -467,53 +416,33 @@ export class NodeComponent {
    * Destroy the component
    */
   destroy() {
-    if (this.modal) {
-      this.hideModal();
-    }
+    // Hide modal if open
+    Modal.hide();
+
     if (this.element) {
       this.element.remove();
     }
   }
 }
 
-// Add CSS animations
+// Add minimal CSS for node components
 const style = document.createElement('style');
 style.textContent = `
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-  
-  @keyframes slideIn {
-    from { 
-      opacity: 0; 
-      transform: translateY(-20px) scale(0.9); 
-    }
-    to { 
-      opacity: 1; 
-      transform: translateY(0) scale(1); 
-    }
-  }
-  
   .node-component {
     user-select: none;
   }
-  
-  .node-modal-content {
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  }
-  
+
   .modal-header {
     border-bottom: 1px solid #eee;
     padding-bottom: 16px;
     margin-bottom: 16px;
   }
-  
+
   .modal-header h2 {
     margin: 0 0 8px 0;
     color: #333;
   }
-  
+
   .distance-info {
     margin: 0;
     color: #666;
