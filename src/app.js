@@ -442,11 +442,16 @@ class VroomGridApp {
    * @param {Object} position - GPS position
    */
   async addPhotoToExistingNode(existingNode, photoData, position) {
-    console.log('📸 Adding photo to existing node:', existingNode.data.etapeId);
+    console.log('📸 Adding photo to existing node:', existingNode);
+    console.log('📸 existingNode.data:', existingNode.data);
 
     try {
+      // existingNode.data.id is the etapeId from database
+      const etapeId = existingNode.data.id;
+      console.log('📸 etapeId:', etapeId, 'type:', typeof etapeId);
+
       // Save photo to database under the same étape
-      const photoId = await databaseService.savePhoto(existingNode.data.etapeId, {
+      const photoId = await databaseService.savePhoto(etapeId, {
         timestamp: photoData.timestamp,
         imageBlob: photoData.imageBlob,
         thumbnailBlob: photoData.thumbnailBlob,
@@ -457,36 +462,30 @@ class VroomGridApp {
 
       console.log(`💾 Additional photo saved with ID: ${photoId}`);
 
-      // Convert blobs to Object URLs
-      const imageURL = URL.createObjectURL(photoData.imageBlob);
-      const thumbnailURL = URL.createObjectURL(photoData.thumbnailBlob);
+      // Reload all photos from database for this étape (same pattern as loadJourney)
+      const allPhotos = await databaseService.getPhotosForEtape(etapeId);
 
-      // Initialize photos array if it doesn't exist
-      if (!existingNode.data.photos) {
-        existingNode.data.photos = [{
-          id: existingNode.data.photoId,
-          image: existingNode.data.image,
-          fullImage: existingNode.data.fullImage
-        }];
-      }
+      // Convert to Object URLs (same pattern as loadJourney)
+      const photosWithUrls = allPhotos.map(photo => ({
+        id: photo.id,
+        image: URL.createObjectURL(photo.thumbnail),
+        fullImage: URL.createObjectURL(photo.imageData)
+      }));
 
-      // Add new photo to photos array
-      existingNode.data.photos.push({
-        id: photoId,
-        image: thumbnailURL,
-        fullImage: imageURL
-      });
+      // Update existingNode data
+      existingNode.data.photos = photosWithUrls;
+      existingNode.data.photoCount = photosWithUrls.length;
+      existingNode.data.image = photosWithUrls[0].image;
+      existingNode.data.fullImage = photosWithUrls[0].fullImage;
 
-      // Update node data
-      existingNode.data.photoCount = existingNode.data.photos.length;
+      console.log(`📸 Photo added to cluster! Total photos: ${photosWithUrls.length}`);
 
-      console.log(`📸 Photo added to cluster! Total photos: ${existingNode.data.photoCount}`);
-
-      // Update the NodeComponent to show the new badge
-      // Find the node component and refresh its appearance
-      const nodeComponent = this.canvasGrid.nodeComponents.get(existingNode.id);
+      // Update the NodeComponent with refreshed data
+      const nodeComponent = this.canvasGrid.nodeComponents.get(existingNode.distance);
       if (nodeComponent) {
+        nodeComponent.nodeData.data = existingNode.data;
         nodeComponent.updateAppearance();
+        console.log(`🔄 Badge updated to show ${photosWithUrls.length} photos`);
       }
 
       // Success feedback
