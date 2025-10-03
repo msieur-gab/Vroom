@@ -9,6 +9,7 @@ import { MilestoneEngine } from './core/MilestoneEngine.js';
 import { cameraModal } from './ui/CameraModal.js';
 import { geolocationService } from './services/geolocation.js';
 import { databaseService } from './services/database.js';
+import { Toast } from './ui/Toast.js';
 
 class VroomGridApp {
   constructor() {
@@ -365,7 +366,7 @@ class VroomGridApp {
         } else if (isCloseInSpace && isCloseInTime && !hasRoomInCluster) {
           // Cluster is full - reject the photo
           console.warn(`⚠️ Cluster full (${currentPhotoCount}/${MAX_PHOTOS_PER_CLUSTER}), photo rejected`);
-          alert(`This location already has ${currentPhotoCount} photos. Please move to a new location to take more photos.`);
+          Toast.warning(`Your car trunk is already containing ${currentPhotoCount} memories! It is time to jump in your car and drive a few miles to capture new adventurer memories. VROoom! 🚗💨`, 6000);
           throw new Error('Cluster is full - cannot add more photos to this location');
         }
       }
