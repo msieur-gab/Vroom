@@ -4,10 +4,11 @@
 
 .camera-container {
   position: relative;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 70vh;
   background: #000;
   overflow: hidden;
+  border-radius: 12px;
 }
 
 .camera-preview {
@@ -162,15 +163,6 @@
 }
 
 /* Camera modal overrides for Modal component */
-.modal-backdrop:has(.camera-container) {
-  background: #000;
-}
-
 .modal-backdrop:has(.camera-container) .modal-content {
-  max-width: 100vw;
-  width: 100vw;
-  max-height: 100vh;
-  height: 100vh;
-  margin: 0;
-  border-radius: 0;
+  padding: 0;
 }

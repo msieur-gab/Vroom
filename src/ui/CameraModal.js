@@ -31,8 +31,8 @@ export class CameraModal {
       Modal.show({
         title: '',
         content: cameraContainer,
-        width: '100%',
-        maxHeight: '100vh',
+        width: '90vw',
+        maxHeight: '80vh',
         hideHeader: true,
         onClose: () => this.cleanup()
       });
