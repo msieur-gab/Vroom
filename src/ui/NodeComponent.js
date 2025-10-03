@@ -300,6 +300,9 @@ export class NodeComponent {
    * Handle modal close
    */
   onModalClose() {
+    // Reset expanded state
+    this.isExpanded = false;
+
     // Reset node highlight
     this.element.style.transform = 'scale(1)';
     this.element.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
