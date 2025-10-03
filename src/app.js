@@ -106,9 +106,8 @@ class VroomGridApp {
           ...etape,
           photos: photos,
           type: 'journey',
-          // Use first photo's data for node display
-          image: photos.length > 0 ? photos[0].thumbnail : null,
-          fullImage: photos.length > 0 ? photos[0].imageData : null,
+          image: photos.length > 0 ? URL.createObjectURL(photos[0].thumbnail) : null,
+          fullImage: photos.length > 0 ? URL.createObjectURL(photos[0].imageData) : null,
           location: etape.latitude && etape.longitude
             ? geolocationService.formatCoordinates(etape.latitude, etape.longitude)
             : 'Unknown location'
@@ -339,11 +338,6 @@ class VroomGridApp {
       const lastRealDistance = lastNode ? (lastNode.data.realDistance || lastNode.distance) : 0;
       const realCumulativeDistance = lastRealDistance + tripDistance;
 
-      // Convert blobs to base64 for database storage
-      // TODO: Migrate database to store blobs directly
-      const imageData = await this.blobToBase64(photoData.imageBlob);
-      const thumbnail = await this.blobToBase64(photoData.thumbnailBlob);
-
       // Save étape to database first
       const etapeId = await databaseService.saveEtape({
         distance: realCumulativeDistance,
@@ -360,11 +354,11 @@ class VroomGridApp {
 
       console.log(`💾 Étape saved with ID: ${etapeId}`);
 
-      // Save photo to database (linked to étape)
+      // Save photo to database (blobs stored directly - no conversion!)
       const photoId = await databaseService.savePhoto(etapeId, {
         timestamp: photoData.timestamp,
-        imageData: imageData,
-        thumbnail: thumbnail,
+        imageBlob: photoData.imageBlob,
+        thumbnailBlob: photoData.thumbnailBlob,
         width: photoData.width,
         height: photoData.height,
         format: photoData.format || 'webp'
@@ -372,12 +366,16 @@ class VroomGridApp {
 
       console.log(`💾 Photo saved with ID: ${photoId}`);
 
+      // Convert blobs to Object URLs for display
+      const imageURL = URL.createObjectURL(photoData.imageBlob);
+      const thumbnailURL = URL.createObjectURL(photoData.thumbnailBlob);
+
       // Add node with photo and location data to grid
       const nodeData = {
         etapeId: etapeId,
         photoId: photoId,
-        image: thumbnail,
-        fullImage: imageData,
+        image: thumbnailURL,
+        fullImage: imageURL,
         location: geolocationService.formatCoordinates(position.latitude, position.longitude),
         latitude: position.latitude,
         longitude: position.longitude,
@@ -407,20 +405,6 @@ class VroomGridApp {
       console.error('❌ Failed to save photo:', error);
       throw error;
     }
-  }
-
-  /**
-   * Convert blob to base64 data URL
-   * @param {Blob} blob - Image blob
-   * @returns {Promise<string>} Base64 data URL
-   */
-  async blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
   }
 
   /**

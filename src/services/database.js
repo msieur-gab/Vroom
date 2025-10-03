@@ -130,7 +130,7 @@ class DatabaseService {
   /**
    * Save a photo to an étape
    * @param {number} etapeId - Parent étape ID
-   * @param {Object} photoData - Photo data with image
+   * @param {Object} photoData - Photo data with Blob images
    * @returns {Promise<number>} Photo ID
    */
   async savePhoto(etapeId, photoData) {
@@ -139,17 +139,17 @@ class DatabaseService {
     const photo = {
       etapeId: etapeId,
       timestamp: photoData.timestamp || Date.now(),
-      imageData: photoData.imageData,
-      thumbnail: photoData.thumbnail,
+      imageData: photoData.imageBlob,
+      thumbnail: photoData.thumbnailBlob,
       width: photoData.width,
       height: photoData.height,
       size: photoData.size,
-      filename: photoData.filename,
+      format: photoData.format || 'webp',
       metadata: photoData.metadata || {}
     };
 
     const id = await this.db.photos.add(photo);
-    console.log('💾 Photo saved:', id, `to étape ${etapeId}`);
+    console.log(`💾 Photo saved (blob):`, id, `to étape ${etapeId}`);
     return id;
   }
 
