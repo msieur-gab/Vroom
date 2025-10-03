@@ -343,7 +343,7 @@ class VroomGridApp {
       // Check for clustering conditions
       const MIN_DISTANCE_METERS = 100; // 100 meters
       const MAX_TIME_GAP_MS = 30 * 60 * 1000; // 30 minutes
-      const MAX_PHOTOS_PER_CLUSTER = 3; // Limit to 3 photos per cluster
+      const MAX_PHOTOS_PER_CLUSTER = 4; // Limit to 4 photos per cluster
 
       const existingNodes = this.grid.getNodesByDistance();
       const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
