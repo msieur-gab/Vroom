@@ -36,9 +36,12 @@ class ToastComponent {
    * Show a toast message
    * @param {string} message - Message to display
    * @param {string} type - Toast type: 'info', 'success', 'warning', 'error'
-   * @param {number} duration - Duration in ms (default 4000)
+   * @param {Object} options - Toast options
+   * @param {number} options.duration - Duration in ms (default 4000, 0 = no auto-close)
+   * @param {boolean} options.tapToDismiss - Allow tap to dismiss (default true)
    */
-  show(message, type = 'info', duration = 4000) {
+  show(message, type = 'info', options = {}) {
+    const { duration = 4000, tapToDismiss = true } = options;
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
 
@@ -74,42 +77,48 @@ class ToastComponent {
       toast.style.transform = 'translateY(0)';
     });
 
-    // Auto remove after duration
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateY(20px)';
+    // Auto remove after duration (if duration > 0)
+    if (duration > 0) {
       setTimeout(() => {
-        if (toast.parentElement) {
-          toast.remove();
-        }
-      }, 300);
-    }, duration);
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+          if (toast.parentElement) {
+            toast.remove();
+          }
+        }, 300);
+      }, duration);
+    }
 
-    // Allow manual close on tap
-    toast.addEventListener('click', () => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateY(20px)';
-      setTimeout(() => toast.remove(), 300);
-    });
+    // Allow manual close on tap (if enabled)
+    if (tapToDismiss) {
+      toast.addEventListener('click', () => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(20px)';
+        setTimeout(() => toast.remove(), 300);
+      });
+      // Add visual hint that it's tappable
+      toast.style.cursor = 'pointer';
+    }
   }
 
   /**
    * Convenience methods
    */
-  info(message, duration) {
-    this.show(message, 'info', duration);
+  info(message, options) {
+    this.show(message, 'info', options);
   }
 
-  success(message, duration) {
-    this.show(message, 'success', duration);
+  success(message, options) {
+    this.show(message, 'success', options);
   }
 
-  warning(message, duration) {
-    this.show(message, 'warning', duration);
+  warning(message, options) {
+    this.show(message, 'warning', options);
   }
 
-  error(message, duration) {
-    this.show(message, 'error', duration);
+  error(message, options) {
+    this.show(message, 'error', options);
   }
 }
 
