@@ -447,11 +447,18 @@ class VroomGridApp {
    * @param {Object} position - GPS position
    */
   async addPhotoToExistingNode(existingNode, photoData, position) {
-    console.log('📸 Adding photo to existing node at distance:', existingNode.distance);
+    console.log('📸 Adding photo to existing node:', existingNode);
 
     try {
-      // existingNode.data.id is the etapeId from database
-      const etapeId = existingNode.data.id;
+      // Try multiple possible locations for etapeId
+      const etapeId = existingNode.data?.etapeId || existingNode.data?.id || existingNode.etapeId || existingNode.id;
+
+      if (!etapeId) {
+        console.error('❌ Could not find etapeId in node:', existingNode);
+        throw new Error('No etapeId found on existing node');
+      }
+
+      console.log('📸 Using etapeId:', etapeId);
 
       // Save photo to database under the same étape
       const photoId = await databaseService.savePhoto(etapeId, {
