@@ -343,6 +343,7 @@ class VroomGridApp {
       // Check for clustering conditions
       const MIN_DISTANCE_METERS = 100; // 100 meters
       const MAX_TIME_GAP_MS = 30 * 60 * 1000; // 30 minutes
+      const MAX_PHOTOS_PER_CLUSTER = 9; // Nice 3x3 gallery grid
 
       const existingNodes = this.grid.getNodesByDistance();
       const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
@@ -351,14 +352,18 @@ class VroomGridApp {
       if (lastNode && lastNode.data && lastNode.data.type === 'journey') {
         const timeSinceLastPhoto = photoData.timestamp - lastNode.data.timestamp;
         const distanceInMeters = tripDistance * 1000; // Convert km to meters
+        const currentPhotoCount = lastNode.data.photoCount || 1;
 
         const isCloseInSpace = distanceInMeters < MIN_DISTANCE_METERS;
         const isCloseInTime = timeSinceLastPhoto < MAX_TIME_GAP_MS;
+        const hasRoomInCluster = currentPhotoCount < MAX_PHOTOS_PER_CLUSTER;
 
-        if (isCloseInSpace && isCloseInTime) {
-          console.log(`📍 Clustering photo with last node (${distanceInMeters.toFixed(0)}m, ${Math.round(timeSinceLastPhoto/1000)}s apart)`);
+        if (isCloseInSpace && isCloseInTime && hasRoomInCluster) {
+          console.log(`📍 Clustering photo with last node (${distanceInMeters.toFixed(0)}m, ${Math.round(timeSinceLastPhoto/1000)}s apart, ${currentPhotoCount + 1}/${MAX_PHOTOS_PER_CLUSTER} photos)`);
           await this.addPhotoToExistingNode(lastNode, photoData, position);
           return;
+        } else if (isCloseInSpace && isCloseInTime && !hasRoomInCluster) {
+          console.log(`📍 Cluster full (${currentPhotoCount}/${MAX_PHOTOS_PER_CLUSTER}), creating new node`);
         }
       }
 
