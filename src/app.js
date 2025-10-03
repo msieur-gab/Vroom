@@ -257,7 +257,7 @@ class VroomGridApp {
         if (loadingText) loadingText.textContent = 'Processing photo...';
       }
 
-      const { imageData, thumbnail, gpsPosition, hasGPS } = captureData;
+      const { imageBlob, thumbnailBlob, gpsPosition, hasGPS } = captureData;
 
       // Calculate distance traveled since last photo
       let tripDistance = 0;
@@ -299,11 +299,12 @@ class VroomGridApp {
 
       // Add photo to journey immediately (no preview modal)
       await this.addPhotoToJourney({
-        imageData,
-        thumbnail,
+        imageBlob,
+        thumbnailBlob,
         timestamp: captureData.timestamp,
         width: captureData.width,
-        height: captureData.height
+        height: captureData.height,
+        format: captureData.format
       }, gpsPosition, tripDistance);
 
       // Hide loading
@@ -324,7 +325,7 @@ class VroomGridApp {
 
   /**
    * Add photo to journey (saves to DB and adds to grid)
-   * @param {Object} photoData - Photo image data
+   * @param {Object} photoData - Photo blob data
    * @param {Object} position - GPS position
    * @param {number} tripDistance - Distance traveled since last photo
    */
@@ -337,6 +338,11 @@ class VroomGridApp {
       const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
       const lastRealDistance = lastNode ? (lastNode.data.realDistance || lastNode.distance) : 0;
       const realCumulativeDistance = lastRealDistance + tripDistance;
+
+      // Convert blobs to base64 for database storage
+      // TODO: Migrate database to store blobs directly
+      const imageData = await this.blobToBase64(photoData.imageBlob);
+      const thumbnail = await this.blobToBase64(photoData.thumbnailBlob);
 
       // Save étape to database first
       const etapeId = await databaseService.saveEtape({
@@ -357,10 +363,11 @@ class VroomGridApp {
       // Save photo to database (linked to étape)
       const photoId = await databaseService.savePhoto(etapeId, {
         timestamp: photoData.timestamp,
-        imageData: photoData.imageData,
-        thumbnail: photoData.thumbnail,
+        imageData: imageData,
+        thumbnail: thumbnail,
         width: photoData.width,
-        height: photoData.height
+        height: photoData.height,
+        format: photoData.format || 'webp'
       });
 
       console.log(`💾 Photo saved with ID: ${photoId}`);
@@ -369,8 +376,8 @@ class VroomGridApp {
       const nodeData = {
         etapeId: etapeId,
         photoId: photoId,
-        image: photoData.thumbnail,
-        fullImage: photoData.imageData,
+        image: thumbnail,
+        fullImage: imageData,
         location: geolocationService.formatCoordinates(position.latitude, position.longitude),
         latitude: position.latitude,
         longitude: position.longitude,
@@ -400,6 +407,20 @@ class VroomGridApp {
       console.error('❌ Failed to save photo:', error);
       throw error;
     }
+  }
+
+  /**
+   * Convert blob to base64 data URL
+   * @param {Blob} blob - Image blob
+   * @returns {Promise<string>} Base64 data URL
+   */
+  async blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   }
 
   /**

@@ -51,9 +51,9 @@ export class CameraService {
   }
 
   /**
-   * Capture photo from video stream
+   * Capture photo from video stream in square format
    * @param {HTMLVideoElement} videoElement - Video element displaying stream
-   * @returns {Promise<Object>} Photo data with imageData and thumbnail
+   * @returns {Promise<Object>} Photo data with Blob and thumbnail Blob
    */
   async capturePhoto(videoElement) {
     console.log('📷 Capturing photo from stream...');
@@ -62,40 +62,80 @@ export class CameraService {
       throw new Error('Invalid video element or stream not ready');
     }
 
+    // Calculate square crop (centered)
+    const sourceWidth = videoElement.videoWidth;
+    const sourceHeight = videoElement.videoHeight;
+    const size = Math.min(sourceWidth, sourceHeight);
+    const offsetX = (sourceWidth - size) / 2;
+    const offsetY = (sourceHeight - size) / 2;
+
+    // Create square canvas
     const canvas = document.createElement('canvas');
-    canvas.width = videoElement.videoWidth;
-    canvas.height = videoElement.videoHeight;
+    canvas.width = size;
+    canvas.height = size;
 
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
 
-    console.log('📷 Converting to data URL...');
-    const imageData = canvas.toDataURL('image/jpeg', 0.85);
+    // Draw cropped square from center
+    ctx.drawImage(
+      videoElement,
+      offsetX, offsetY, size, size,  // Source crop
+      0, 0, size, size                // Destination
+    );
+
+    console.log('📷 Converting to WebP blob...');
+    const imageBlob = await this.canvasToBlob(canvas, 'image/webp', 0.92);
 
     console.log('📷 Creating thumbnail...');
-    const thumbnail = await this.createThumbnail(canvas);
+    const thumbnailBlob = await this.createThumbnail(canvas);
 
     const photoData = {
-      imageData,
-      thumbnail,
+      imageBlob,
+      thumbnailBlob,
       timestamp: Date.now(),
-      width: canvas.width,
-      height: canvas.height,
-      size: imageData.length
+      width: size,
+      height: size,
+      size: imageBlob.size,
+      format: 'webp'
     };
 
     console.log('✅ Photo captured successfully:', {
       width: photoData.width,
-      height: photoData.height
+      height: photoData.height,
+      size: `${(photoData.size / 1024).toFixed(2)} KB`,
+      format: photoData.format
     });
 
     return photoData;
   }
 
   /**
+   * Convert canvas to blob
+   * @param {HTMLCanvasElement} canvas - Source canvas
+   * @param {string} mimeType - Image MIME type
+   * @param {number} quality - Quality 0-1
+   * @returns {Promise<Blob>} Image blob
+   */
+  async canvasToBlob(canvas, mimeType = 'image/webp', quality = 0.92) {
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to create blob from canvas'));
+          }
+        },
+        mimeType,
+        quality
+      );
+    });
+  }
+
+  /**
    * Create thumbnail from canvas
    * @param {HTMLCanvasElement} canvas - Source canvas
-   * @returns {Promise<string>} Thumbnail data URL
+   * @returns {Promise<Blob>} Thumbnail blob
    */
   async createThumbnail(canvas) {
     const thumbnailCanvas = document.createElement('canvas');
@@ -108,7 +148,7 @@ export class CameraService {
     const ctx = thumbnailCanvas.getContext('2d');
     ctx.drawImage(canvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
 
-    return thumbnailCanvas.toDataURL('image/jpeg', 0.7);
+    return this.canvasToBlob(thumbnailCanvas, 'image/webp', 0.85);
   }
 
   /**
@@ -127,7 +167,7 @@ export class CameraService {
 
   /**
    * Fallback: Use file input for camera capture (compatibility mode)
-   * @returns {Promise<Object>} Photo data
+   * @returns {Promise<Object>} Photo data with blobs
    */
   async captureFromFile() {
     console.log('📷 Using file input fallback...');
@@ -150,22 +190,30 @@ export class CameraService {
           reader.onload = async (event) => {
             const img = new Image();
             img.onload = async () => {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.width;
-              canvas.height = img.height;
-              const ctx = canvas.getContext('2d');
-              ctx.drawImage(img, 0, 0);
+              // Calculate square crop
+              const size = Math.min(img.width, img.height);
+              const offsetX = (img.width - size) / 2;
+              const offsetY = (img.height - size) / 2;
 
-              const imageData = canvas.toDataURL('image/jpeg', 0.85);
-              const thumbnail = await this.createThumbnail(canvas);
+              const canvas = document.createElement('canvas');
+              canvas.width = size;
+              canvas.height = size;
+              const ctx = canvas.getContext('2d');
+
+              // Draw square crop
+              ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
+
+              const imageBlob = await this.canvasToBlob(canvas, 'image/webp', 0.92);
+              const thumbnailBlob = await this.createThumbnail(canvas);
 
               resolve({
-                imageData,
-                thumbnail,
+                imageBlob,
+                thumbnailBlob,
                 timestamp: Date.now(),
-                width: img.width,
-                height: img.height,
-                size: imageData.length
+                width: size,
+                height: size,
+                size: imageBlob.size,
+                format: 'webp'
               });
             };
             img.onerror = () => reject(new Error('Failed to load image'));

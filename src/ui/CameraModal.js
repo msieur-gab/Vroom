@@ -14,6 +14,7 @@ export class CameraModal {
     this.videoElement = null;
     this.gpsPosition = null;
     this.gpsAcquiring = false;
+    this.facingMode = 'environment'; // 'environment' (back) or 'user' (front)
   }
 
   /**
@@ -66,6 +67,7 @@ export class CameraModal {
 
       <div class="camera-overlay">
         <div class="camera-header">
+          <button class="camera-flip-btn" aria-label="Flip camera">🔄</button>
           <button class="camera-close-btn" aria-label="Close camera">✕</button>
         </div>
 
@@ -89,10 +91,12 @@ export class CameraModal {
     // Get elements
     this.videoElement = container.querySelector('.camera-video');
     const closeBtn = container.querySelector('.camera-close-btn');
+    const flipBtn = container.querySelector('.camera-flip-btn');
     const captureBtn = container.querySelector('.camera-capture-btn');
 
     // Event listeners
     closeBtn.addEventListener('click', () => this.close());
+    flipBtn.addEventListener('click', () => this.flipCamera());
     captureBtn.addEventListener('click', () => this.capture());
 
     return container;
@@ -102,19 +106,59 @@ export class CameraModal {
    * Start camera stream and attach to video element
    */
   async startCamera() {
-    console.log('📷 Starting camera stream...');
+    console.log(`📷 Starting camera stream (${this.facingMode})...`);
 
     try {
-      this.stream = await cameraService.startPreview();
+      // Stop existing stream if any
+      if (this.stream) {
+        cameraService.stopPreview(this.stream);
+      }
+
+      // Get new stream with current facing mode
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: this.facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1920 }  // Request square-ish for better crop
+        },
+        audio: false
+      });
 
       if (this.videoElement) {
         this.videoElement.srcObject = this.stream;
         await this.videoElement.play();
-        console.log('✅ Camera preview started');
+        console.log(`✅ Camera preview started (${this.facingMode})`);
       }
     } catch (error) {
       console.error('❌ Failed to start camera:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Flip between front and back camera
+   */
+  async flipCamera() {
+    console.log('🔄 Flipping camera...');
+
+    try {
+      // Toggle facing mode
+      this.facingMode = this.facingMode === 'environment' ? 'user' : 'environment';
+
+      // Restart camera with new facing mode
+      await this.startCamera();
+
+      // Haptic feedback
+      if ('vibrate' in navigator) {
+        navigator.vibrate(50);
+      }
+
+      console.log(`✅ Camera flipped to ${this.facingMode}`);
+    } catch (error) {
+      console.error('❌ Failed to flip camera:', error);
+      // Revert on error
+      this.facingMode = this.facingMode === 'environment' ? 'user' : 'environment';
+      alert('Failed to switch camera. This device may only have one camera.');
     }
   }
 
