@@ -2,15 +2,38 @@
  * Modal - Reusable modal dialog component
  * Singleton pattern for performance (one instance reused across app)
  *
+ * Architecture:
+ * - Creates DOM structure once on first instantiation
+ * - Swaps content on each show() call (no DOM recreation)
+ * - Automatic cleanup of callbacks and event listeners
+ * - CSS animations handled via class toggling
+ *
  * Usage:
+ *   import Modal from './Modal.js';
+ *
  *   Modal.show({
  *     title: 'My Title',
  *     content: '<div>HTML content</div>', // or HTMLElement
  *     width: '500px',
+ *     maxHeight: '80vh',
  *     onClose: () => console.log('closed')
  *   });
  *
- *   Modal.hide();
+ *   Modal.hide();  // Programmatic close
+ *
+ * Features:
+ * - Click backdrop to close
+ * - ESC key to close
+ * - Close button in header
+ * - Fade-in and slide-in animations
+ * - Responsive sizing with max-width/max-height
+ * - Supports both HTML strings and HTMLElement content
+ *
+ * CSS Requirements:
+ * - .modal-backdrop: Overlay with flex centering
+ * - .modal-content: Modal container with transform animation
+ * - .modal-visible: Class added for animation trigger
+ * - CSS transition duration should match setTimeout in hide() (300ms)
  */
 export class Modal {
   static instance = null;
