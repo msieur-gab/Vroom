@@ -48,13 +48,16 @@ export class CameraModal {
       });
 
       // Start camera stream
+      console.log('📷 About to start camera stream...');
       await this.startCamera();
+      console.log('📷 Camera stream started successfully');
 
       // Start GPS acquisition in background
       this.acquireGPS();
 
     } catch (error) {
       console.error('❌ Camera modal error:', error);
+      console.error('Error stack:', error.stack);
       Modal.hide();
 
       // Show error to user
