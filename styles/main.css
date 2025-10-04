@@ -676,36 +676,37 @@ body {
 
 .frame-stamp {
   position: absolute;
-  top: 20px;
+  bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
   background: rgba(255, 215, 0, 0.95);
   color: #333;
-  padding: 12px 20px;
-  border-radius: 12px;
+  padding: 8px 16px;
+  border-radius: 8px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-  border: 3px solid #FFA500;
+  border: 2px solid #FFA500;
   font-weight: 700;
 }
 
 .stamp-icon {
-  font-size: 32px;
+  font-size: 20px;
   line-height: 1;
 }
 
 .stamp-text {
-  font-size: 14px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .stamp-distance {
-  font-size: 18px;
+  font-size: 12px;
   color: #D97706;
+  font-weight: 800;
 }
 
 /* SVG Character Overlay */

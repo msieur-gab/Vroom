@@ -333,31 +333,51 @@ export class CameraModal {
         ctx.lineTo(canvas.width - margin, canvas.height - margin - cornerSize);
         ctx.stroke();
 
-        // Draw stamp at top instead of bottom
-        const stampWidth = 300;
-        const stampHeight = 120;
-        const stampX = (canvas.width - stampWidth) / 2;
-        const stampY = 40;
+        // Draw compact stamp at bottom
+        const stampHeight = 50;
+        const stampPadding = 40;
+        const stampY = canvas.height - stampHeight - stampPadding;
 
+        // Measure text to size the stamp dynamically
+        ctx.font = 'bold 24px system-ui';
+        const iconWidth = 30;
+        ctx.font = 'bold 14px system-ui';
+        const titleWidth = ctx.measureText(this.milestone.title.toUpperCase()).width;
+        ctx.font = 'bold 18px system-ui';
+        const distanceWidth = ctx.measureText(`${this.milestone.distance}km`).width;
+
+        const stampWidth = iconWidth + titleWidth + distanceWidth + 60; // Add padding
+        const stampX = (canvas.width - stampWidth) / 2;
+
+        // Draw rounded rectangle background
         ctx.fillStyle = 'rgba(255, 215, 0, 0.95)';
         ctx.strokeStyle = '#FFA500';
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.roundRect(stampX, stampY, stampWidth, stampHeight, 16);
+        ctx.roundRect(stampX, stampY, stampWidth, stampHeight, 12);
         ctx.fill();
         ctx.stroke();
 
+        // Draw content horizontally
+        let currentX = stampX + 15;
+
+        // Icon
         ctx.fillStyle = '#333';
-        ctx.textAlign = 'center';
-        ctx.font = 'bold 48px system-ui';
-        ctx.fillText(this.milestone.icon, stampX + stampWidth/2, stampY + 55);
-
-        ctx.font = 'bold 18px system-ui';
-        ctx.fillText(this.milestone.title.toUpperCase(), stampX + stampWidth/2, stampY + 85);
-
-        ctx.fillStyle = '#D97706';
         ctx.font = 'bold 24px system-ui';
-        ctx.fillText(`${this.milestone.distance}km`, stampX + stampWidth/2, stampY + 112);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(this.milestone.icon, currentX, stampY + stampHeight/2);
+        currentX += iconWidth + 10;
+
+        // Title
+        ctx.font = 'bold 14px system-ui';
+        ctx.fillText(this.milestone.title.toUpperCase(), currentX, stampY + stampHeight/2);
+        currentX += titleWidth + 10;
+
+        // Distance
+        ctx.fillStyle = '#D97706';
+        ctx.font = 'bold 18px system-ui';
+        ctx.fillText(`${this.milestone.distance}km`, currentX, stampY + stampHeight/2);
 
         // Convert to blob
         canvas.toBlob((blob) => {
