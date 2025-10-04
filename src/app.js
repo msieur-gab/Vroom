@@ -172,12 +172,17 @@ class VroomGridApp {
         // Mark milestone as unlocked in engine
         this.milestoneEngine.unlockMilestone(milestone.distance);
 
+        // Get the original milestone definition from MilestoneEngine to re-enrich with overlay
+        const originalMilestone = this.milestoneEngine.getMilestone(milestone.id);
+        console.log('🔍 Original milestone definition:', originalMilestone);
+
         // Use a tiny offset for visual distance to prevent overlap
         const visualDistance = milestone.distance > 0 ? milestone.distance - 0.01 : 0;
 
-        // Prepare milestone data with schema-compatible fields
+        // Prepare milestone data with schema-compatible fields, merging with original definition
         const milestoneData = {
           ...milestone,
+          ...(originalMilestone || {}), // Re-enrich with original data (includes overlay)
           isMilestone: true,
           achievement: `${milestone.icon} ${milestone.title}`,
           description: milestone.description,
@@ -187,6 +192,8 @@ class VroomGridApp {
           badgeEarned: `${milestone.icon} ${milestone.title}`,
           title: milestone.title
         };
+
+        console.log('📦 Enriched milestone data with overlay:', milestoneData.overlay);
 
         // Don't spread milestoneData as it contains 'type' field which conflicts
         const nodeId = this.grid.addPhotoNode(visualDistance, milestoneData);
