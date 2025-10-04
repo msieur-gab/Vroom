@@ -8,12 +8,16 @@
     { "field": "achievement", "type": "header" },
     { "field": "description", "type": "text" },
     { "field": "celebration", "type": "celebration" },
+    { "field": "selfieImage", "type": "image", "condition": "hasSelfie" },
     { "field": "totalDistance", "type": "stat", "icon": "📏", "suffix": "km" },
     { "field": "timeElapsed", "type": "stat", "icon": "⏱️", "suffix": "h" },
     { "field": "badgeEarned", "type": "badge" }
   ],
   "modal": {
-    "title": "🏁 Milestone Reached!",
-    "width": "450px"
+    "title": "🏆 Achievement Unlocked!",
+    "width": "450px",
+    "actions": [
+      { "id": "take-selfie", "label": "📸 Take Celebratory Selfie", "condition": "!hasSelfie" }
+    ]
   }
 }

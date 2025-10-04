@@ -256,6 +256,9 @@ class VroomGridApp {
     // Listen for photo-captured event from CameraModal
     document.addEventListener('photo-captured', (e) => this.handlePhotoCaptured(e.detail));
 
+    // Listen for milestone selfie request
+    document.addEventListener('milestone-selfie-requested', (e) => this.handleMilestoneSelfieRequest(e.detail));
+
     // Settings button - could set home position
     const settingsBtn = document.getElementById('settings-btn');
     if (settingsBtn) {
@@ -549,6 +552,19 @@ class VroomGridApp {
       console.error('❌ Failed to add photo to existing node:', error);
       throw error;
     }
+  }
+
+  /**
+   * Handle milestone selfie request from NodeComponent
+   */
+  async handleMilestoneSelfieRequest({ milestone, nodeComponent }) {
+    console.log('🏆 Opening milestone selfie camera for:', milestone.name);
+
+    // Store milestone and node reference for later
+    this.pendingMilestoneSelfie = { milestone, nodeComponent };
+
+    // Open camera with milestone info
+    await cameraModal.open({ milestone });
   }
 
   /**
@@ -1058,6 +1074,33 @@ class VroomGridApp {
     // Use a tiny offset for the distance to prevent overwriting a user node at the exact same location in the canvas map.
     const visualDistance = milestone.distance > 0 ? milestone.distance - 0.01 : 0;
 
+    // Check for collision: find journey node in the same grid cell
+    const milestoneCoords = this.canvasGrid.distanceToCoords(milestone.distance);
+    let journeyNodeData = null;
+
+    // Search for journey nodes in the same cell
+    for (const [distance, node] of this.canvasGrid.nodes) {
+      if (node.type === 'journey' &&
+          node.coords.row === milestoneCoords.row &&
+          node.coords.col === milestoneCoords.col) {
+        journeyNodeData = node.data;
+        console.log(`🔍 Collision detected! Journey node found at (${node.coords.row}, ${node.coords.col})`);
+
+        // Remove the journey node since we'll merge it into milestone
+        this.canvasGrid.nodes.delete(distance);
+
+        // Remove the interactive component if it exists
+        const overlay = this.canvasGrid.container.querySelector('.node-overlay');
+        if (overlay) {
+          const journeyElement = overlay.querySelector(`[data-distance="${distance}"]`);
+          if (journeyElement) {
+            journeyElement.remove();
+          }
+        }
+        break;
+      }
+    }
+
     // Prepare milestone data with schema-compatible fields
     const milestoneData = {
       ...milestone,
@@ -1068,7 +1111,20 @@ class VroomGridApp {
       totalDistance: milestone.distance,
       timeElapsed: Math.floor(milestone.distance / 20), // Rough estimate: 20km/hour
       badgeEarned: `${milestone.icon} ${milestone.name}`,
-      title: milestone.name
+      title: milestone.name,
+      // If collision detected, merge journey photo data
+      ...(journeyNodeData && {
+        hasPhoto: true,
+        image: journeyNodeData.image || journeyNodeData.fullImage,
+        fullImage: journeyNodeData.fullImage,
+        images: [journeyNodeData.fullImage || journeyNodeData.image],
+        location: journeyNodeData.location,
+        latitude: journeyNodeData.latitude,
+        longitude: journeyNodeData.longitude,
+        photoTimestamp: journeyNodeData.timestamp,
+        photoId: journeyNodeData.photoId,
+        etapeId: journeyNodeData.etapeId
+      })
     };
 
     // Save milestone to database

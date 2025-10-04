@@ -15,14 +15,23 @@ export class CameraModal {
     this.gpsPosition = null;
     this.gpsAcquiring = false;
     this.facingMode = 'environment'; // 'environment' (back) or 'user' (front)
+    this.milestone = null;
   }
 
   /**
    * Open camera modal with live preview
+   * @param {Object} options - Camera options
+   * @param {Object} options.milestone - Milestone info for selfie mode
    * @returns {Promise<void>}
    */
-  async open() {
-    console.log('📷 Opening camera modal...');
+  async open(options = {}) {
+    this.milestone = options.milestone || null;
+
+    if (this.milestone) {
+      console.log(`🏆 Opening milestone selfie camera for: ${this.milestone.name}`);
+    } else {
+      console.log('📷 Opening camera modal...');
+    }
 
     try {
       // Create camera UI

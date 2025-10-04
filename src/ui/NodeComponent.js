@@ -294,6 +294,56 @@ export class NodeComponent {
       maxHeight: '80vh',
       onClose: () => this.onModalClose()
     });
+
+    // Attach action button listeners
+    setTimeout(() => {
+      document.querySelectorAll('.modal-action-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => this.handleAction(e.target.dataset.action));
+      });
+    }, 0);
+  }
+
+  /**
+   * Handle action button click
+   */
+  handleAction(actionId) {
+    if (actionId === 'take-selfie') {
+      this.takeMilestoneSelfie();
+    }
+  }
+
+  /**
+   * Open camera to take milestone selfie
+   */
+  async takeMilestoneSelfie() {
+    const { data } = this.nodeData;
+    console.log('📸 Taking milestone selfie:', data);
+
+    // Close modal first
+    Modal.hide();
+
+    // Dispatch event to app to open camera with milestone info
+    const event = new CustomEvent('milestone-selfie-requested', {
+      detail: {
+        milestone: data,
+        nodeComponent: this
+      },
+      bubbles: true
+    });
+    document.dispatchEvent(event);
+  }
+
+  /**
+   * Evaluate condition expression (simple implementation)
+   */
+  evaluateCondition(condition, data) {
+    // Handle negation
+    if (condition.startsWith('!')) {
+      const field = condition.substring(1);
+      return !data[field];
+    }
+    // Check if field exists and is truthy
+    return !!data[condition];
   }
 
   /**
@@ -350,6 +400,12 @@ export class NodeComponent {
     this.schema.content.forEach(field => {
       const value = preparedData[field.field];
 
+      // Check conditional rendering
+      if (field.condition) {
+        const conditionMet = this.evaluateCondition(field.condition, preparedData);
+        if (!conditionMet) return;
+      }
+
       // Skip single fullImage if we have a gallery
       if (field.field === 'fullImage' && preparedData.images && preparedData.images.length > 1) {
         return;
@@ -366,6 +422,21 @@ export class NodeComponent {
     });
 
     content += '</div>';
+
+    // Add action buttons if defined in schema
+    if (this.schema.modal.actions) {
+      content += '<div class="modal-actions">';
+      this.schema.modal.actions.forEach(action => {
+        // Check condition
+        if (action.condition) {
+          const conditionMet = this.evaluateCondition(action.condition, preparedData);
+          if (!conditionMet) return;
+        }
+        content += `<button class="modal-action-btn" data-action="${action.id}">${action.label}</button>`;
+      });
+      content += '</div>';
+    }
+
     return content;
   }
   
