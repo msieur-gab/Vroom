@@ -44,8 +44,8 @@ export const SELFIE_OVERLAYS = {
 
   'party-hat': `
     <svg class="selfie-overlay" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-      <!-- Colorful party hat on head -->
-      <g transform="translate(150, 40)">
+      <!-- Colorful party hat on top of head (moved higher to not block face) -->
+      <g transform="translate(150, 20)">
         <!-- Hat cone -->
         <path d="M -50,20 L 0,-60 L 50,20 Z" fill="#FF6B6B" stroke="#CC5555" stroke-width="3"/>
         <!-- Stripes -->

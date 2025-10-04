@@ -31,6 +31,8 @@
   object-fit: cover;
   object-position: center;
   border-radius: 16px;
+  /* Mirror the video for selfie mode - makes alignment easier */
+  transform: scaleX(-1);
 }
 
 /* GPS Indicator - small dot in top-left */

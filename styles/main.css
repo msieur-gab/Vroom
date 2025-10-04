@@ -719,6 +719,8 @@ body {
   align-items: center;
   justify-content: center;
   pointer-events: none;
+  /* Mirror to match the flipped video preview */
+  transform: scaleX(-1);
 }
 
 .selfie-overlay {
