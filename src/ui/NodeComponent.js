@@ -319,9 +319,6 @@ export class NodeComponent {
     const { data } = this.nodeData;
     console.log('📸 Taking milestone selfie:', data);
 
-    // Close modal first
-    Modal.hide();
-
     // Dispatch event to app to open camera with milestone info
     const event = new CustomEvent('milestone-selfie-requested', {
       detail: {
@@ -331,6 +328,9 @@ export class NodeComponent {
       bubbles: true
     });
     document.dispatchEvent(event);
+
+    // Close modal after dispatching event (let camera handle the UI)
+    setTimeout(() => Modal.hide(), 100);
   }
 
   /**

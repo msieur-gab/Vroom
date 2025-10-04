@@ -563,8 +563,13 @@ class VroomGridApp {
     // Store milestone and node reference for later
     this.pendingMilestoneSelfie = { milestone, nodeComponent };
 
-    // Open camera with milestone info
-    await cameraModal.open({ milestone });
+    try {
+      // Open camera with milestone info
+      await cameraModal.open({ milestone });
+    } catch (error) {
+      console.error('❌ Failed to open milestone selfie camera:', error);
+      alert('Failed to open camera: ' + error.message);
+    }
   }
 
   /**
