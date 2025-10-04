@@ -8,7 +8,7 @@ export const GRID_CONFIG = {
   KM_PER_CELL: 10,
 
   // Number of cells per row (affects serpentine width)
-  CELLS_PER_ROW: 5,
+  CELLS_PER_ROW: 4,
 
   // Calculated: kilometers per row
   get KM_PER_ROW() {
@@ -17,7 +17,7 @@ export const GRID_CONFIG = {
 
   // Visual settings
   CELL_PADDING: 4,        // px spacing between cells
-  HORIZONTAL_PADDING: 30, // px padding on left/right edges
+  HORIZONTAL_PADDING: 16, // px padding on left/right edges
 
   // Cell size range (responsive)
   MIN_CELL_SIZE: 60,      // Minimum cell size in pixels
