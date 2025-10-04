@@ -30,6 +30,8 @@ export class CameraModal {
 
     if (this.milestone) {
       console.log(`🏆 Opening milestone selfie camera for: ${this.milestone.name}`);
+      console.log('🎨 Milestone data:', this.milestone);
+      console.log('🎭 Overlay type:', this.milestone.overlay);
     } else {
       console.log('📷 Opening camera modal...');
     }
@@ -86,11 +88,16 @@ export class CameraModal {
           <span class="stamp-text">${this.milestone.title}</span>
           <span class="stamp-distance">${this.milestone.distance}km</span>
         </div>
-        ${this.milestone.overlay ? `
+        ${this.milestone.overlay ? (() => {
+          const svg = getOverlaySVG(this.milestone.overlay);
+          console.log('🎭 Generating overlay SVG for:', this.milestone.overlay);
+          console.log('📝 SVG length:', svg.length);
+          return `
           <div class="selfie-overlay-container">
-            ${getOverlaySVG(this.milestone.overlay)}
+            ${svg}
           </div>
-        ` : ''}
+          `;
+        })() : ''}
       </div>
     ` : '';
 
