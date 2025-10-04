@@ -260,7 +260,8 @@ export class CameraModal {
    * Close camera modal
    */
   close() {
-    console.log('📷 Closing camera modal');
+    console.log('📷 close() called');
+    console.trace('📷 Close stack trace:');
     this.cleanup();
     Modal.hide();
   }
@@ -269,7 +270,8 @@ export class CameraModal {
    * Cleanup camera resources
    */
   cleanup() {
-    console.log('📷 Cleaning up camera resources...');
+    console.log('📷 cleanup() called');
+    console.trace('📷 Cleanup stack trace:');
 
     // Stop camera stream
     if (this.stream) {
@@ -286,6 +288,7 @@ export class CameraModal {
     // Reset GPS state
     this.gpsPosition = null;
     this.gpsAcquiring = false;
+    this.milestone = null;
   }
 }
 

@@ -319,20 +319,15 @@ export class NodeComponent {
     const { data } = this.nodeData;
     console.log('📸 Taking milestone selfie:', data);
 
-    // Close modal first
-    Modal.hide();
-
-    // Wait a bit then dispatch event (ensure modal is fully closed)
-    setTimeout(() => {
-      const event = new CustomEvent('milestone-selfie-requested', {
-        detail: {
-          milestone: data,
-          nodeComponent: this
-        },
-        bubbles: true
-      });
-      document.dispatchEvent(event);
-    }, 200);
+    // Dispatch event immediately - camera modal will replace this modal
+    const event = new CustomEvent('milestone-selfie-requested', {
+      detail: {
+        milestone: data,
+        nodeComponent: this
+      },
+      bubbles: true
+    });
+    document.dispatchEvent(event);
   }
 
   /**
