@@ -333,11 +333,11 @@ export class CameraModal {
         ctx.lineTo(canvas.width - margin, canvas.height - margin - cornerSize);
         ctx.stroke();
 
-        // Draw stamp
+        // Draw stamp at top instead of bottom
         const stampWidth = 300;
         const stampHeight = 120;
         const stampX = (canvas.width - stampWidth) / 2;
-        const stampY = canvas.height - stampHeight - 40;
+        const stampY = 40;
 
         ctx.fillStyle = 'rgba(255, 215, 0, 0.95)';
         ctx.strokeStyle = '#FFA500';
