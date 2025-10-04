@@ -7,6 +7,7 @@
 import { Modal } from './Modal.js';
 import { cameraService } from '../services/camera.js';
 import { geolocationService } from '../services/geolocation.js';
+import { getOverlaySVG } from './SelfieOverlays.js';
 
 export class CameraModal {
   constructor() {
@@ -72,9 +73,31 @@ export class CameraModal {
   createCameraUI() {
     const container = document.createElement('div');
     container.className = 'camera-container';
+
+    // Milestone frame overlay with SVG character overlay
+    const milestoneFrame = this.milestone ? `
+      <div class="milestone-frame-overlay">
+        <div class="frame-corner frame-top-left"></div>
+        <div class="frame-corner frame-top-right"></div>
+        <div class="frame-corner frame-bottom-left"></div>
+        <div class="frame-corner frame-bottom-right"></div>
+        <div class="frame-stamp">
+          <span class="stamp-icon">${this.milestone.icon}</span>
+          <span class="stamp-text">${this.milestone.title}</span>
+          <span class="stamp-distance">${this.milestone.distance}km</span>
+        </div>
+        ${this.milestone.overlay ? `
+          <div class="selfie-overlay-container">
+            ${getOverlaySVG(this.milestone.overlay)}
+          </div>
+        ` : ''}
+      </div>
+    ` : '';
+
     container.innerHTML = `
       <div class="camera-preview">
         <video class="camera-video" autoplay playsinline></video>
+        ${milestoneFrame}
         <div class="gps-indicator"></div>
       </div>
 
@@ -211,7 +234,13 @@ export class CameraModal {
       this.showFlashEffect();
 
       // Capture photo from video stream
-      const photoData = await cameraService.capturePhoto(this.videoElement);
+      let photoData = await cameraService.capturePhoto(this.videoElement);
+
+      // If milestone mode, composite the frame onto the photo
+      if (this.milestone) {
+        console.log('🏆 Compositing milestone frame onto photo');
+        photoData = await this.compositeFrame(photoData);
+      }
 
       // Add GPS data and milestone info if available
       const captureData = {
@@ -241,6 +270,132 @@ export class CameraModal {
       console.error('❌ Photo capture failed:', error);
       alert('Failed to capture photo. Please try again.');
     }
+  }
+
+  /**
+   * Composite milestone frame onto captured photo
+   */
+  async compositeFrame(photoData) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+
+        // Draw original photo
+        ctx.drawImage(img, 0, 0);
+
+        // Draw SVG overlay if available
+        if (this.milestone.overlay) {
+          await this.drawSVGOverlay(ctx, canvas.width, canvas.height);
+        }
+
+        // Draw golden corner frames
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 8;
+        const cornerSize = 80;
+        const margin = 30;
+
+        // Top-left
+        ctx.beginPath();
+        ctx.moveTo(margin + cornerSize, margin);
+        ctx.lineTo(margin, margin);
+        ctx.lineTo(margin, margin + cornerSize);
+        ctx.stroke();
+
+        // Top-right
+        ctx.beginPath();
+        ctx.moveTo(canvas.width - margin - cornerSize, margin);
+        ctx.lineTo(canvas.width - margin, margin);
+        ctx.lineTo(canvas.width - margin, margin + cornerSize);
+        ctx.stroke();
+
+        // Bottom-left
+        ctx.beginPath();
+        ctx.moveTo(margin, canvas.height - margin - cornerSize);
+        ctx.lineTo(margin, canvas.height - margin);
+        ctx.lineTo(margin + cornerSize, canvas.height - margin);
+        ctx.stroke();
+
+        // Bottom-right
+        ctx.beginPath();
+        ctx.moveTo(canvas.width - margin - cornerSize, canvas.height - margin);
+        ctx.lineTo(canvas.width - margin, canvas.height - margin);
+        ctx.lineTo(canvas.width - margin, canvas.height - margin - cornerSize);
+        ctx.stroke();
+
+        // Draw stamp
+        const stampWidth = 300;
+        const stampHeight = 120;
+        const stampX = (canvas.width - stampWidth) / 2;
+        const stampY = canvas.height - stampHeight - 40;
+
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.95)';
+        ctx.strokeStyle = '#FFA500';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.roundRect(stampX, stampY, stampWidth, stampHeight, 16);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'center';
+        ctx.font = 'bold 48px system-ui';
+        ctx.fillText(this.milestone.icon, stampX + stampWidth/2, stampY + 55);
+
+        ctx.font = 'bold 18px system-ui';
+        ctx.fillText(this.milestone.title.toUpperCase(), stampX + stampWidth/2, stampY + 85);
+
+        ctx.fillStyle = '#D97706';
+        ctx.font = 'bold 24px system-ui';
+        ctx.fillText(`${this.milestone.distance}km`, stampX + stampWidth/2, stampY + 112);
+
+        // Convert to blob
+        canvas.toBlob((blob) => {
+          resolve({
+            ...photoData,
+            imageBlob: blob,
+            thumbnailBlob: blob
+          });
+        }, 'image/jpeg', 0.9);
+      };
+
+      img.src = URL.createObjectURL(photoData.imageBlob);
+    });
+  }
+
+  /**
+   * Draw SVG overlay onto canvas
+   */
+  async drawSVGOverlay(ctx, width, height) {
+    return new Promise((resolve, reject) => {
+      const svgString = getOverlaySVG(this.milestone.overlay);
+      const blob = new Blob([svgString], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+
+      const overlayImg = new Image();
+      overlayImg.onload = () => {
+        // Draw SVG centered and scaled to fit
+        const size = Math.min(width, height);
+        const x = (width - size) / 2;
+        const y = (height - size) / 2;
+
+        ctx.globalAlpha = 0.85;
+        ctx.drawImage(overlayImg, x, y, size, size);
+        ctx.globalAlpha = 1.0;
+
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      overlayImg.onerror = () => {
+        console.warn('⚠️ Failed to load SVG overlay');
+        URL.revokeObjectURL(url);
+        resolve(); // Continue without overlay
+      };
+      overlayImg.src = url;
+    });
   }
 
   /**

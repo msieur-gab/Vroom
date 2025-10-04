@@ -19,7 +19,8 @@ export class MilestoneEngine {
         name: 'First Steps',
         icon: '👶',
         description: 'Every journey begins with a single step',
-        color: '#4CAF50'
+        color: '#4CAF50',
+        overlay: 'baby-hat'
       },
       {
         id: 'explorer',
@@ -27,7 +28,8 @@ export class MilestoneEngine {
         name: 'Explorer',
         icon: '🧭',
         description: 'You\'re getting the hang of this adventure thing!',
-        color: '#2196F3'
+        color: '#2196F3',
+        overlay: 'explorer-goggles'
       },
       {
         id: 'century_mark',
@@ -35,7 +37,8 @@ export class MilestoneEngine {
         name: 'Century Mark',
         icon: '💯',
         description: '100 kilometers of memories captured',
-        color: '#FF9800'
+        color: '#FF9800',
+        overlay: 'party-hat'
       },
       {
         id: 'road_warrior',
@@ -43,7 +46,8 @@ export class MilestoneEngine {
         name: 'Road Warrior',
         icon: '🏆',
         description: 'Serious traveler status achieved',
-        color: '#9C27B0'
+        color: '#9C27B0',
+        overlay: 'warrior-helmet'
       },
       {
         id: 'thousand_miles',
@@ -51,7 +55,8 @@ export class MilestoneEngine {
         name: 'Five Hundred',
         icon: '🌟',
         description: 'Half a thousand kilometers of adventure!',
-        color: '#F44336'
+        color: '#F44336',
+        overlay: 'star-crown'
       },
       {
         id: 'ultra_explorer',
@@ -59,7 +64,8 @@ export class MilestoneEngine {
         name: 'Ultra Explorer',
         icon: '🚀',
         description: 'One thousand kilometers! You\'re unstoppable!',
-        color: '#E91E63'
+        color: '#E91E63',
+        overlay: 'astronaut-helmet'
       },
       {
         id: 'lunar_distance',
@@ -67,7 +73,8 @@ export class MilestoneEngine {
         name: 'Lunar Distance',
         icon: '🌙',
         description: 'You could have traveled to the Moon!',
-        color: '#607D8B'
+        color: '#607D8B',
+        overlay: 'moon-glasses'
       },
       {
         id: 'around_earth',
@@ -75,7 +82,8 @@ export class MilestoneEngine {
         name: 'Around Earth',
         icon: '🌍',
         description: 'You\'ve traveled the circumference of Earth!',
-        color: '#795548'
+        color: '#795548',
+        overlay: 'globe-crown'
       }
     ];
   }
