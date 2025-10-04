@@ -173,7 +173,10 @@ class VroomGridApp {
         this.milestoneEngine.unlockMilestone(milestone.distance);
 
         // Get the original milestone definition from MilestoneEngine to re-enrich with overlay
-        const originalMilestone = this.milestoneEngine.getMilestone(milestone.id);
+        // Database stores milestone ID in 'type' field
+        const milestoneId = milestone.type || milestone.id;
+        const originalMilestone = this.milestoneEngine.getMilestone(milestoneId);
+        console.log('🔍 Looking up milestone by ID:', milestoneId);
         console.log('🔍 Original milestone definition:', originalMilestone);
 
         // Use a tiny offset for visual distance to prevent overlap
