@@ -213,14 +213,19 @@ export class CameraModal {
       // Capture photo from video stream
       const photoData = await cameraService.capturePhoto(this.videoElement);
 
-      // Add GPS data if available
+      // Add GPS data and milestone info if available
       const captureData = {
         ...photoData,
         gpsPosition: this.gpsPosition,
-        hasGPS: !!this.gpsPosition
+        hasGPS: !!this.gpsPosition,
+        milestone: this.milestone || null,
+        isMilestoneSelfie: !!this.milestone
       };
 
       console.log('✅ Photo captured with GPS:', captureData.hasGPS);
+      if (captureData.isMilestoneSelfie) {
+        console.log('🏆 Milestone selfie captured for:', this.milestone.title);
+      }
 
       // Emit custom event
       const event = new CustomEvent('photo-captured', {

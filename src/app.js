@@ -300,7 +300,13 @@ class VroomGridApp {
         if (loadingText) loadingText.textContent = 'Processing photo...';
       }
 
-      const { imageBlob, thumbnailBlob, gpsPosition, hasGPS } = captureData;
+      const { imageBlob, thumbnailBlob, gpsPosition, hasGPS, isMilestoneSelfie, milestone } = captureData;
+
+      // Handle milestone selfie separately
+      if (isMilestoneSelfie && milestone) {
+        await this.handleMilestoneSelfie(captureData);
+        return;
+      }
 
       // Calculate distance traveled since last photo
       let tripDistance = 0;
@@ -558,7 +564,7 @@ class VroomGridApp {
    * Handle milestone selfie request from NodeComponent
    */
   async handleMilestoneSelfieRequest({ milestone, nodeComponent }) {
-    console.log('🏆 Opening milestone selfie camera for:', milestone.name);
+    console.log('🏆 Opening milestone selfie camera for:', milestone.title);
 
     // Store milestone and node reference for later
     this.pendingMilestoneSelfie = { milestone, nodeComponent };
@@ -569,6 +575,60 @@ class VroomGridApp {
     } catch (error) {
       console.error('❌ Failed to open milestone selfie camera:', error);
       alert('Failed to open camera: ' + error.message);
+    }
+  }
+
+  /**
+   * Handle milestone selfie capture
+   */
+  async handleMilestoneSelfie(captureData) {
+    const { imageBlob, thumbnailBlob, milestone } = captureData;
+
+    console.log('🏆 Saving milestone selfie for:', milestone.title);
+
+    try {
+      // Convert to Object URLs
+      const imageURL = URL.createObjectURL(imageBlob);
+      const thumbnailURL = URL.createObjectURL(thumbnailBlob);
+
+      // Update milestone data with selfie
+      milestone.hasSelfie = true;
+      milestone.selfieImage = imageURL;
+      milestone.selfieBlob = imageBlob;
+      milestone.selfieThumbnail = thumbnailURL;
+
+      // Find and update the milestone node in canvas
+      const milestoneNode = Array.from(this.canvasGrid.nodes.values()).find(
+        node => node.type === 'milestone' && node.data.distance === milestone.distance
+      );
+
+      if (milestoneNode) {
+        // Update node data
+        Object.assign(milestoneNode.data, {
+          hasSelfie: true,
+          selfieImage: imageURL
+        });
+
+        // Update NodeComponent if it exists
+        const nodeComponent = this.canvasGrid.nodeComponents.get(milestoneNode.distance);
+        if (nodeComponent) {
+          nodeComponent.nodeData.data = milestoneNode.data;
+          // Reopen the modal to show the selfie
+          nodeComponent.showModal();
+        }
+
+        console.log('✅ Milestone selfie saved and displayed');
+      }
+
+      // Hide loading
+      const loadingOverlay = document.getElementById('loading-overlay');
+      if (loadingOverlay) {
+        loadingOverlay.classList.add('hidden');
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to save milestone selfie:', error);
+      throw error;
     }
   }
 
