@@ -1135,6 +1135,7 @@ class VroomGridApp {
    */
   async addMilestoneNode(milestone) {
     console.log(`🎨 Adding milestone node: ${milestone.name} at ${milestone.distance}km`);
+    console.log('🎭 Milestone has overlay:', milestone.overlay);
 
     // Use a tiny offset for the distance to prevent overwriting a user node at the exact same location in the canvas map.
     const visualDistance = milestone.distance > 0 ? milestone.distance - 0.01 : 0;
@@ -1191,6 +1192,8 @@ class VroomGridApp {
         etapeId: journeyNodeData.etapeId
       })
     };
+
+    console.log('📦 milestoneData prepared with overlay:', milestoneData.overlay);
 
     // Save milestone to database
     try {
