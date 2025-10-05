@@ -142,6 +142,7 @@ export default {
       subtitle: '{distance}km deiner Reise'
     },
     fields: {
+      title: 'Titel',
       achievement: 'Erfolg',
       description: 'Beschreibung',
       celebration: 'Feier',
@@ -152,7 +153,8 @@ export default {
       weather: 'Wetter',
       mood: 'Stimmung',
       status: 'Status',
-      rarity: 'Seltenheit'
+      rarity: 'Seltenheit',
+      images: 'Fotos'
     }
   }
 };
