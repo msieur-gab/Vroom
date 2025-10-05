@@ -396,15 +396,18 @@ class DatabaseService {
   async getDefaultPlayer() {
     await this.ensureInitialized();
 
-    // Try to find player marked as default
-    let player = await this.db.players.where('isDefault').equals(true).first();
+    // Get all players and find default
+    const players = await this.db.players.toArray();
 
-    // If no default marked, get first player
-    if (!player) {
-      player = await this.db.players.orderBy('created').first();
+    // Try to find player marked as default
+    let player = players.find(p => p.isDefault === true);
+
+    // If no default marked, get first player by created date
+    if (!player && players.length > 0) {
+      player = players.sort((a, b) => a.created - b.created)[0];
     }
 
-    return player;
+    return player || null;
   }
 
   /**

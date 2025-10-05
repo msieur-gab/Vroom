@@ -83,12 +83,13 @@ export default {
     settings: 'Ajustes',
     distance: 'Distancia',
     adventures: 'Aventuras',
-    badges: 'Insignias'
+    badges: 'Insignias',
+    milestoneUnlocked: '¡Has viajado {distance}km!'
   },
 
   // Hitos
   milestones: {
-    firstSteps: {
+    first_steps: {
       title: 'Primeros Pasos',
       description: 'Cada viaje comienza con un primer paso'
     },
@@ -96,21 +97,62 @@ export default {
       title: 'Explorador',
       description: '¡Le estás cogiendo el truco a esto de las aventuras!'
     },
-    centuryMark: {
+    century_mark: {
       title: 'Marca del Centenario',
       description: '100 kilómetros de recuerdos capturados'
     },
-    roadWarrior: {
+    road_warrior: {
       title: 'Guerrero del Camino',
       description: 'Estado de viajero serio alcanzado'
     },
-    thousandMiles: {
-      title: 'Mil Kilómetros',
-      description: 'Hito de viaje épico'
+    five_hundred: {
+      title: 'Quinientos',
+      description: '¡Medio millar de kilómetros de aventura!'
     },
-    moonDistance: {
+    ultra_explorer: {
+      title: 'Ultra Explorador',
+      description: '¡Mil kilómetros! ¡Eres imparable!'
+    },
+    lunar_distance: {
       title: 'Distancia Lunar',
       description: '¡Podrías haber viajado hasta la Luna!'
+    },
+    around_earth: {
+      title: 'Alrededor de la Tierra',
+      description: '¡Has viajado la circunferencia de la Tierra!'
+    }
+  },
+
+  // Esquemas de nodos
+  schemas: {
+    journey: {
+      title: '📷 Foto de Viaje',
+      subtitle: '{distance}km del viaje de {playerName}'
+    },
+    milestone: {
+      title: '🏁 ¡Hito Alcanzado, {playerName}!',
+      subtitle: '{distance}km de tu viaje'
+    },
+    reward: {
+      title: '🏆 ¡Logro Desbloqueado!',
+      subtitle: '{distance}km de tu viaje'
+    },
+    checkpoint: {
+      title: '📍 Detalles del Punto de Control',
+      subtitle: '{distance}km de tu viaje'
+    },
+    fields: {
+      achievement: 'Logro',
+      description: 'Descripción',
+      celebration: 'Celebración',
+      totalDistance: 'Distancia Total',
+      timeElapsed: 'Tiempo Transcurrido',
+      badgeEarned: 'Insignia Obtenida',
+      location: 'Ubicación',
+      weather: 'Clima',
+      mood: 'Estado de ánimo',
+      status: 'Estado',
+      rarity: 'Rareza'
     }
   }
 };

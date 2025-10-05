@@ -30,9 +30,17 @@ class VrooomApp {
     // Initialize database first
     await databaseService.init();
 
-    // Initialize i18n
-    await i18n.init();
-    console.log('✅ i18n initialized, locale:', i18n.getLocale());
+    // Load saved language from database
+    const savedLanguage = await databaseService.getSetting('language');
+
+    // Initialize i18n with saved language
+    if (savedLanguage) {
+      await i18n.setLocale(savedLanguage);
+      console.log('✅ i18n initialized from database, locale:', i18n.getLocale());
+    } else {
+      await i18n.init();
+      console.log('✅ i18n initialized (auto-detect), locale:', i18n.getLocale());
+    }
 
     // Check if onboarding is completed
     const onboardingComplete = await databaseService.getSetting('onboarding_complete');
@@ -53,6 +61,9 @@ class VrooomApp {
 
     this.activePlayerId = defaultPlayer.id;
     console.log('👤 Active player:', defaultPlayer.name, `(ID: ${this.activePlayerId})`);
+
+    // Set player name for i18n personalization
+    i18n.setPlayerName(defaultPlayer.name);
 
     // Initialize core systems
     await this.initializeApp();
@@ -122,7 +133,7 @@ class VrooomApp {
     // Initialize core systems
     this.grid = new TravelGrid();
     this.pathRouter = new PathRouter(this.grid);
-    this.milestoneEngine = new MilestoneEngine();
+    this.milestoneEngine = new MilestoneEngine(i18n);
 
     // Setup canvas journey grid
     const gridContainer = document.querySelector('.grid-container');
@@ -276,7 +287,7 @@ class VrooomApp {
           isMilestone: true,
           achievement: `${milestone.icon} ${milestone.title}`,
           description: milestone.description,
-          celebration: `You've traveled ${milestone.distance}km!`,
+          celebration: i18n.t('app.milestoneUnlocked', { distance: milestone.distance }),
           totalDistance: milestone.distance,
           timeElapsed: Math.floor(milestone.distance / 20),
           badgeEarned: `${milestone.icon} ${milestone.title}`,
@@ -1191,7 +1202,7 @@ class VrooomApp {
       isMilestone: true,
       achievement: `${milestone.icon} ${milestone.name}`,
       description: milestone.description,
-      celebration: `You've traveled ${milestone.distance}km!`,
+      celebration: i18n.t('app.milestoneUnlocked', { distance: milestone.distance }),
       totalDistance: milestone.distance,
       timeElapsed: Math.floor(milestone.distance / 20), // Rough estimate: 20km/hour
       badgeEarned: `${milestone.icon} ${milestone.name}`,

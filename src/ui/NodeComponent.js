@@ -1,4 +1,5 @@
 import Modal from './Modal.js';
+import { i18n } from '../i18n/i18n.js';
 
 /**
  * NodeComponent - Simple schema-driven interactive node
@@ -17,7 +18,6 @@ export class NodeComponent {
     await this.loadSchema();
     this.createElement();
     this.attachEventListeners();
-    console.log('🎯 Node component initialized:', this.nodeData);
   }
   
   async loadSchema() {
@@ -184,8 +184,6 @@ export class NodeComponent {
    * Handle tap/click interaction
    */
   handleTap() {
-    console.log('🎯 Node tapped:', this.nodeData);
-    
     if (this.isExpanded) {
       this.collapse();
     } else {
@@ -286,9 +284,17 @@ export class NodeComponent {
     this.element.style.transform = 'scale(1.1)';
     this.element.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
 
+    // Get localized title with player name
+    const titleKey = this.schema?.modal?.title?.startsWith('i18n:')
+      ? this.schema.modal.title.substring(5)
+      : null;
+    const title = titleKey
+      ? i18n.t(titleKey, { playerName: i18n.playerName })
+      : (this.schema?.modal?.title || 'Node Details');
+
     // Show modal with generated content
     Modal.show({
-      title: this.schema?.modal?.title || 'Node Details',
+      title: title,
       content: this.generateModalContent(),
       width: this.schema?.modal?.width || '500px',
       maxHeight: '80vh',
@@ -338,12 +344,16 @@ export class NodeComponent {
       preparedData.fullImage = data.photos[0].fullImage;
     }
 
+    // Get localized subtitle with player name
+    const subtitleKey = `schemas.${this.nodeData.type}.subtitle`;
+    const subtitle = i18n.t(subtitleKey, {
+      distance,
+      playerName: i18n.playerName
+    });
+
+    // Start with subtitle as first content
     let content = `
-      <div class="modal-header">
-        <h2>${this.schema.modal.title}</h2>
-        <p class="distance-info">${distance}km on your journey</p>
-      </div>
-      <div class="modal-content">
+      <p class="distance-info" style="color: #666; font-size: 0.9em; margin-bottom: 16px;">${subtitle}</p>
     `;
 
     // Generate content from schema
@@ -365,17 +375,27 @@ export class NodeComponent {
       }
     });
 
-    content += '</div>';
     return content;
   }
   
+  /**
+   * Get localized field label
+   */
+  getFieldLabel(fieldName) {
+    const labelKey = `schemas.fields.${fieldName}`;
+    const label = i18n.t(labelKey);
+    // If translation not found, return the field name as fallback
+    return label === labelKey ? fieldName : label;
+  }
+
   /**
    * Render a field based on its type
    */
   renderField(field, value) {
     const icon = field.icon ? field.icon + ' ' : '';
     const suffix = field.suffix || '';
-    
+    const label = this.getFieldLabel(field.field);
+
     switch (field.type) {
       case 'header':
         return `<h3>${icon}${value}</h3>`;
@@ -385,22 +405,32 @@ export class NodeComponent {
         return Array.isArray(value) ?
           `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 8px 0;">${value.map(img => `<img src="${img}" style="width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; cursor: pointer;">`).join('')}</div>` : '';
       case 'tags':
-        return Array.isArray(value) ? 
+        return Array.isArray(value) ?
           `<div>${value.map(tag => `<span style="background: #f0f0f0; padding: 4px 8px; border-radius: 12px; font-size: 12px; margin: 2px;">${tag}</span>`).join(' ')}</div>` : '';
       case 'stat':
-        return `<p><strong>${icon}${field.field}:</strong> ${value}${suffix}</p>`;
+        return `<p><strong>${icon}${label}:</strong> ${value}${suffix}</p>`;
       case 'status':
-        return `<p><strong>Status:</strong> ${value}</p>`;
+        return `<p><strong>${i18n.t('schemas.fields.status')}:</strong> ${value}</p>`;
       case 'rarity':
-        return `<p><strong>Rarity:</strong> ${value}</p>`;
+        return `<p><strong>${i18n.t('schemas.fields.rarity')}:</strong> ${value}</p>`;
+      case 'celebration':
+        return `<p style="font-style: italic; color: #666;">${value}</p>`;
+      case 'badge':
+        return `<p style="font-size: 1.2em; font-weight: bold; color: #FF9800;">${value}</p>`;
       case 'list':
-        return Array.isArray(value) ? 
+        return Array.isArray(value) ?
           `<ul>${value.map(item => `<li>${item}</li>`).join('')}</ul>` : '';
       case 'date':
       case 'datetime':
-        return `<p><strong>${icon}${field.field}:</strong> ${new Date(value).toLocaleDateString()}</p>`;
+        return `<p><strong>${icon}${label}:</strong> ${new Date(value).toLocaleDateString()}</p>`;
+      case 'text':
+        // For text fields, show without label if it's a description
+        if (field.field === 'description') {
+          return `<p>${value}</p>`;
+        }
+        return `<p><strong>${icon}${label}:</strong> ${value}${suffix}</p>`;
       default:
-        return `<p><strong>${icon}${field.field}:</strong> ${value}${suffix}</p>`;
+        return `<p><strong>${icon}${label}:</strong> ${value}${suffix}</p>`;
     }
   }
   

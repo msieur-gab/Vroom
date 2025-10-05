@@ -83,12 +83,13 @@ export default {
     settings: 'Einstellungen',
     distance: 'Entfernung',
     adventures: 'Abenteuer',
-    badges: 'Abzeichen'
+    badges: 'Abzeichen',
+    milestoneUnlocked: 'Du hast {distance}km zurückgelegt!'
   },
 
   // Meilensteine
   milestones: {
-    firstSteps: {
+    first_steps: {
       title: 'Erste Schritte',
       description: 'Jede Reise beginnt mit einem ersten Schritt'
     },
@@ -96,21 +97,62 @@ export default {
       title: 'Entdecker',
       description: 'Du bekommst den Dreh raus mit diesem Abenteuer!'
     },
-    centuryMark: {
+    century_mark: {
       title: 'Hundert-Kilometer-Marke',
       description: '100 Kilometer an Erinnerungen festgehalten'
     },
-    roadWarrior: {
+    road_warrior: {
       title: 'Straßenkrieger',
       description: 'Status eines ernsthaften Reisenden erreicht'
     },
-    thousandMiles: {
-      title: 'Tausend Kilometer',
-      description: 'Epischer Reisemeilenstein'
+    five_hundred: {
+      title: 'Fünfhundert',
+      description: 'Ein halbes Tausend Kilometer Abenteuer!'
     },
-    moonDistance: {
+    ultra_explorer: {
+      title: 'Ultra-Entdecker',
+      description: 'Tausend Kilometer! Du bist unaufhaltsam!'
+    },
+    lunar_distance: {
       title: 'Mondentfernung',
       description: 'Du hättest zum Mond reisen können!'
+    },
+    around_earth: {
+      title: 'Rund um die Erde',
+      description: 'Du hast den Erdumfang bereist!'
+    }
+  },
+
+  // Knotenschemas
+  schemas: {
+    journey: {
+      title: '📷 Reisefoto',
+      subtitle: '{distance}km von {playerName}s Reise'
+    },
+    milestone: {
+      title: '🏁 Meilenstein Erreicht, {playerName}!',
+      subtitle: '{distance}km deiner Reise'
+    },
+    reward: {
+      title: '🏆 Erfolg Freigeschaltet!',
+      subtitle: '{distance}km deiner Reise'
+    },
+    checkpoint: {
+      title: '📍 Checkpoint-Details',
+      subtitle: '{distance}km deiner Reise'
+    },
+    fields: {
+      achievement: 'Erfolg',
+      description: 'Beschreibung',
+      celebration: 'Feier',
+      totalDistance: 'Gesamtdistanz',
+      timeElapsed: 'Verstrichene Zeit',
+      badgeEarned: 'Erhaltenes Abzeichen',
+      location: 'Standort',
+      weather: 'Wetter',
+      mood: 'Stimmung',
+      status: 'Status',
+      rarity: 'Seltenheit'
     }
   }
 };

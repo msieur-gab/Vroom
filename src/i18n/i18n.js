@@ -9,6 +9,15 @@ class I18nService {
     this.translations = {};
     this.listeners = new Set();
     this.supportedLocales = ['en', 'fr', 'es', 'de'];
+    this.playerName = null; // Current player name for personalization
+  }
+
+  /**
+   * Set player name for personalized messages
+   * @param {string} name - Player name
+   */
+  setPlayerName(name) {
+    this.playerName = name;
   }
 
   /**
@@ -62,8 +71,6 @@ class I18nService {
 
       // Notify listeners
       this.notifyListeners();
-
-      console.log(`🌍 Language set to: ${locale}`);
     } catch (error) {
       console.error(`Failed to load translations for ${locale}:`, error);
 
@@ -103,6 +110,34 @@ class I18nService {
     }
 
     return value;
+  }
+
+  /**
+   * Translate text if it's an i18n key (starts with "i18n:")
+   * Utility helper for schema-based translations
+   * @param {string} text - Text or i18n key (e.g., "i18n:schemas.milestone.title")
+   * @param {Object} replacements - Optional values to replace in translation
+   * @returns {string} Translated text or original text if not an i18n key
+   */
+  translate(text, replacements = {}) {
+    if (typeof text === 'string' && text.startsWith('i18n:')) {
+      const key = text.substring(5); // Remove "i18n:" prefix
+      return this.t(key, replacements);
+    }
+    return text;
+  }
+
+  /**
+   * Translate with automatic player name injection
+   * @param {string} key - Translation key
+   * @param {Object} replacements - Optional values to replace in translation
+   * @returns {string} Translated text with player name
+   */
+  tp(key, replacements = {}) {
+    return this.t(key, {
+      playerName: this.playerName || 'Adventurer',
+      ...replacements
+    });
   }
 
   /**

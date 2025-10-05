@@ -13,7 +13,7 @@
     { "field": "earnedDate", "type": "date" }
   ],
   "modal": {
-    "title": "🏆 Achievement Unlocked!",
+    "title": "i18n:schemas.reward.title",
     "width": "450px"
   }
 }

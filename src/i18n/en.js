@@ -83,12 +83,13 @@ export default {
     settings: 'Settings',
     distance: 'Distance',
     adventures: 'Adventures',
-    badges: 'Badges'
+    badges: 'Badges',
+    milestoneUnlocked: 'You\'ve traveled {distance}km!'
   },
 
   // Milestones
   milestones: {
-    firstSteps: {
+    first_steps: {
       title: 'First Steps',
       description: 'Every journey begins with a single step'
     },
@@ -96,21 +97,62 @@ export default {
       title: 'Explorer',
       description: 'You\'re getting the hang of this adventure thing!'
     },
-    centuryMark: {
+    century_mark: {
       title: 'Century Mark',
       description: '100 kilometers of memories captured'
     },
-    roadWarrior: {
+    road_warrior: {
       title: 'Road Warrior',
       description: 'Serious traveler status achieved'
     },
-    thousandMiles: {
-      title: 'Thousand Kilometers',
-      description: 'Epic journey milestone'
+    five_hundred: {
+      title: 'Five Hundred',
+      description: 'Half a thousand kilometers of adventure!'
     },
-    moonDistance: {
+    ultra_explorer: {
+      title: 'Ultra Explorer',
+      description: 'One thousand kilometers! You\'re unstoppable!'
+    },
+    lunar_distance: {
       title: 'Lunar Distance',
       description: 'You could have traveled to the Moon!'
+    },
+    around_earth: {
+      title: 'Around Earth',
+      description: 'You\'ve traveled the circumference of Earth!'
+    }
+  },
+
+  // Node schemas
+  schemas: {
+    journey: {
+      title: '📷 Journey Photo',
+      subtitle: '{distance}km on {playerName}\'s journey'
+    },
+    milestone: {
+      title: '🏁 Milestone Reached, {playerName}!',
+      subtitle: '{distance}km on your journey'
+    },
+    reward: {
+      title: '🏆 Achievement Unlocked!',
+      subtitle: '{distance}km on your journey'
+    },
+    checkpoint: {
+      title: '📍 Checkpoint Details',
+      subtitle: '{distance}km on your journey'
+    },
+    fields: {
+      achievement: 'Achievement',
+      description: 'Description',
+      celebration: 'Celebration',
+      totalDistance: 'Total Distance',
+      timeElapsed: 'Time Elapsed',
+      badgeEarned: 'Badge Earned',
+      location: 'Location',
+      weather: 'Weather',
+      mood: 'Mood',
+      status: 'Status',
+      rarity: 'Rarity'
     }
   }
 };

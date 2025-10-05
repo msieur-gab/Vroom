@@ -13,7 +13,7 @@
     { "field": "badgeEarned", "type": "badge" }
   ],
   "modal": {
-    "title": "🏁 Milestone Reached!",
+    "title": "i18n:schemas.milestone.title",
     "width": "450px"
   }
 }

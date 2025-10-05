@@ -13,7 +13,7 @@
     { "field": "notes", "type": "text" }
   ],
   "modal": {
-    "title": "📍 Checkpoint Details",
+    "title": "i18n:schemas.checkpoint.title",
     "width": "400px"
   }
 }

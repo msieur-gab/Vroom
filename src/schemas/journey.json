@@ -15,7 +15,7 @@
     { "field": "tags", "type": "tags" }
   ],
   "modal": {
-    "title": "📷 Journey Photo",
+    "title": "i18n:schemas.journey.title",
     "width": "500px"
   }
 }
