@@ -11,6 +11,8 @@ import { geolocationService } from './services/geolocation.js';
 import { databaseService } from './services/database.js';
 import { Toast } from './ui/Toast.js';
 import { i18n } from './i18n/i18n.js';
+import { ClusteringConfig } from './config.js';
+import { objectURLManager } from './utils/objectURLManager.js';
 import './ui/OnboardingFlow.js'; // Register web component
 
 class VrooomApp {
@@ -20,6 +22,7 @@ class VrooomApp {
     this.canvasGrid = null;      // Canvas journey grid renderer
     this.milestoneEngine = null;
     this.activePlayerId = null;  // Current player ID
+    this.objectURLs = new Set();  // Track created object URLs for cleanup
 
     this.init();
   }
@@ -211,8 +214,8 @@ class VrooomApp {
         // Convert photo blobs to Object URLs for display
         const photosWithUrls = photos.map(photo => ({
           id: photo.id,
-          image: URL.createObjectURL(photo.thumbnail),
-          fullImage: URL.createObjectURL(photo.imageData)
+          image: objectURLManager.create(photo.thumbnail),
+          fullImage: objectURLManager.create(photo.imageData)
         }));
 
         // Calculate visual distance for grid placement
@@ -511,11 +514,7 @@ class VrooomApp {
     console.log('💾 Adding photo to journey...');
 
     try {
-      // Check for clustering conditions
-      const MIN_DISTANCE_METERS = 100; // 100 meters
-      const MAX_TIME_GAP_MS = 30 * 60 * 1000; // 30 minutes
-      const MAX_PHOTOS_PER_CLUSTER = 4; // Limit to 4 photos per cluster
-
+      // Check for clustering conditions using config
       const existingNodes = this.grid.getNodesByDistance();
       const lastNode = existingNodes.length > 0 ? existingNodes[existingNodes.length - 1] : null;
 
@@ -525,17 +524,17 @@ class VrooomApp {
         const distanceInMeters = tripDistance * 1000; // Convert km to meters
         const currentPhotoCount = lastNode.data.photoCount || 1;
 
-        const isCloseInSpace = distanceInMeters < MIN_DISTANCE_METERS;
-        const isCloseInTime = timeSinceLastPhoto < MAX_TIME_GAP_MS;
-        const hasRoomInCluster = currentPhotoCount < MAX_PHOTOS_PER_CLUSTER;
+        const isCloseInSpace = distanceInMeters < ClusteringConfig.minDistanceMeters;
+        const isCloseInTime = timeSinceLastPhoto < ClusteringConfig.maxTimeGapMs;
+        const hasRoomInCluster = currentPhotoCount < ClusteringConfig.maxPhotosPerCluster;
 
         if (isCloseInSpace && isCloseInTime && hasRoomInCluster) {
-          console.log(`📍 Clustering photo with last node (${distanceInMeters.toFixed(0)}m, ${Math.round(timeSinceLastPhoto/1000)}s apart, ${currentPhotoCount + 1}/${MAX_PHOTOS_PER_CLUSTER} photos)`);
+          console.log(`📍 Clustering photo with last node (${distanceInMeters.toFixed(0)}m, ${Math.round(timeSinceLastPhoto/1000)}s apart, ${currentPhotoCount + 1}/${ClusteringConfig.maxPhotosPerCluster} photos)`);
           await this.addPhotoToExistingNode(lastNode, photoData, position);
           return;
         } else if (isCloseInSpace && isCloseInTime && !hasRoomInCluster) {
           // Cluster is full - reject the photo
-          console.warn(`⚠️ Cluster full (${currentPhotoCount}/${MAX_PHOTOS_PER_CLUSTER}), photo rejected`);
+          console.warn(`⚠️ Cluster full (${currentPhotoCount}/${ClusteringConfig.maxPhotosPerCluster}), photo rejected`);
           Toast.warning(`Your car trunk is already containing ${currentPhotoCount} memories! It is time to jump in your car and drive a few miles to capture new adventurer memories. VROoom! 🚗💨`, {
             duration: 0, // No auto-close - kids can read at their own pace
             tapToDismiss: true // Tap to dismiss when done reading
@@ -579,8 +578,8 @@ class VrooomApp {
       console.log(`💾 Photo saved with ID: ${photoId}`);
 
       // Convert blobs to Object URLs for display
-      const imageURL = URL.createObjectURL(photoData.imageBlob);
-      const thumbnailURL = URL.createObjectURL(photoData.thumbnailBlob);
+      const imageURL = objectURLManager.create(photoData.imageBlob);
+      const thumbnailURL = objectURLManager.create(photoData.thumbnailBlob);
 
       // Add node with photo and location data to grid
       const nodeData = {
@@ -659,8 +658,8 @@ class VrooomApp {
       // Convert to Object URLs (same pattern as loadJourney)
       const photosWithUrls = allPhotos.map(photo => ({
         id: photo.id,
-        image: URL.createObjectURL(photo.thumbnail),
-        fullImage: URL.createObjectURL(photo.imageData)
+        image: objectURLManager.create(photo.thumbnail),
+        fullImage: objectURLManager.create(photo.imageData)
       }));
 
       // Update existingNode data
@@ -927,6 +926,7 @@ class VrooomApp {
         this.canvasGrid.clearNodes(); // Clear canvas nodes
         this.milestoneEngine.reset(); // Reset achievements
         geolocationService.reset();   // Reset geolocation (clears lastPosition and homePosition)
+        objectURLManager.revokeAll(); // Revoke all object URLs to prevent memory leaks
         this.updateStats(0);          // Reset statistics to 0
 
         console.log('✅ All data cleared (memory + database)');
