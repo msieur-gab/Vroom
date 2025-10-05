@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vroom Grid is a mobile-first Progressive Web Application that transforms travel photography into a visual grid-based journey. Photos are positioned on an orthogonal grid based on cumulative distance traveled, with roads connecting them in a serpentine (boustrophedon) pattern. The project focuses on visual storytelling through an engaging game-like representation of real-world adventures.
+Vrooom is a mobile-first Progressive Web Application that transforms travel photography into a visual grid-based journey. Photos are positioned on an orthogonal grid based on cumulative distance traveled, with roads connecting them in a serpentine (boustrophedon) pattern. The project focuses on visual storytelling through an engaging game-like representation of real-world adventures.
 
 ## Core Concept
 
@@ -71,7 +71,7 @@ window.vroom.debug()
 
 ### Project Structure
 ```
-vroom-grid/
+vrooom/
 ├── src/
 │   ├── core/                    # Business logic
 │   │   ├── TravelGrid.js        # Grid coordinate system & data storage

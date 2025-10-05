@@ -1,7 +1,7 @@
 # Node Placement & Board Game Pattern Documentation
 
 ## Overview
-The Vroom Grid uses a **board game serpentine pattern** for placing travel nodes, where each cell represents 20km of distance and nodes flow in alternating left-to-right and right-to-left patterns between rows.
+Vrooom uses a **board game serpentine pattern** for placing travel nodes, where each cell represents 20km of distance and nodes flow in alternating left-to-right and right-to-left patterns between rows.
 
 ## Core Concepts
 

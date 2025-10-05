@@ -1,4 +1,4 @@
-# Vroom Grid Pathfinding Implementation Notes
+# Vrooom Pathfinding Implementation Notes
 
 ## Problem Summary
 The main challenge was implementing proper U-turn directions for orthogonal road connections between travel nodes in a serpentine (board game) grid pattern. Initial implementations created diagonal connectors and incorrect upward curves instead of natural downward serpentine flows.

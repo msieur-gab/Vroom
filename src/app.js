@@ -10,22 +10,114 @@ import { cameraModal } from './ui/CameraModal.js';
 import { geolocationService } from './services/geolocation.js';
 import { databaseService } from './services/database.js';
 import { Toast } from './ui/Toast.js';
+import { i18n } from './i18n/i18n.js';
+import './ui/OnboardingFlow.js'; // Register web component
 
-class VroomGridApp {
+class VrooomApp {
   constructor() {
     this.grid = null;
     this.pathRouter = null;
     this.canvasGrid = null;      // Canvas journey grid renderer
     this.milestoneEngine = null;
-    
+    this.activePlayerId = null;  // Current player ID
+
     this.init();
   }
-  
+
   async init() {
-    console.log('🗺️ Initializing Vroom Grid...');
+    console.log('🗺️ Initializing Vrooom...');
 
     // Initialize database first
     await databaseService.init();
+
+    // Initialize i18n
+    await i18n.init();
+    console.log('✅ i18n initialized, locale:', i18n.getLocale());
+
+    // Check if onboarding is completed
+    const onboardingComplete = await databaseService.getSetting('onboarding_complete');
+
+    if (!onboardingComplete) {
+      console.log('👋 First launch - showing onboarding');
+      await this.showOnboarding();
+      return; // Don't initialize app yet
+    }
+
+    // Get active player
+    const defaultPlayer = await databaseService.getDefaultPlayer();
+    if (!defaultPlayer) {
+      console.error('❌ No default player found - showing onboarding');
+      await this.showOnboarding();
+      return;
+    }
+
+    this.activePlayerId = defaultPlayer.id;
+    console.log('👤 Active player:', defaultPlayer.name, `(ID: ${this.activePlayerId})`);
+
+    // Initialize core systems
+    await this.initializeApp();
+  }
+
+  /**
+   * Show onboarding flow for first-time users
+   */
+  async showOnboarding() {
+    // Hide main app UI
+    const mainApp = document.querySelector('.app-container');
+    if (mainApp) {
+      mainApp.style.display = 'none';
+    }
+
+    // Create and show onboarding component
+    const onboardingFlow = document.createElement('onboarding-flow');
+    document.body.appendChild(onboardingFlow);
+
+    // Listen for completion
+    onboardingFlow.addEventListener('onboarding-complete', async (e) => {
+      console.log('✅ Onboarding completed:', e.detail);
+
+      const { playerName, playerAvatar, playerColor, language } = e.detail;
+
+      try {
+        // Create default player
+        const playerId = await databaseService.savePlayer({
+          name: playerName,
+          avatar: playerAvatar,
+          color: playerColor,
+          isDefault: true
+        });
+
+        console.log('💾 Default player created:', playerId);
+
+        // Save onboarding settings
+        await databaseService.saveSetting('onboarding_complete', true);
+        await databaseService.saveSetting('language', language);
+
+        // Set active player
+        this.activePlayerId = playerId;
+
+        // Remove onboarding UI
+        onboardingFlow.remove();
+
+        // Show main app UI
+        if (mainApp) {
+          mainApp.style.display = '';
+        }
+
+        // Initialize app
+        await this.initializeApp();
+      } catch (error) {
+        console.error('❌ Failed to complete onboarding:', error);
+        Toast.error('Failed to complete setup. Please try again.');
+      }
+    });
+  }
+
+  /**
+   * Initialize the main application
+   */
+  async initializeApp() {
+    console.log('🚀 Initializing app for player:', this.activePlayerId);
 
     // Initialize core systems
     this.grid = new TravelGrid();
@@ -54,7 +146,7 @@ class VroomGridApp {
     // Check permissions and show help if needed
     await this.checkPermissions();
 
-    console.log('🚀 Vroom Grid initialized successfully!');
+    console.log('🚀 Vrooom initialized successfully!');
     console.log('');
     console.log('🧪 Testing methods available:');
     console.log('  window.vroom.addNode(tripKm) - Add photo node (cumulative distance)');
@@ -74,13 +166,13 @@ class VroomGridApp {
     console.log('📂 Loading journey from database...');
 
     try {
-      // Load all étapes with their photos
-      console.log('🔍 Step 1: Loading étapes...');
-      const etapes = await databaseService.getAllEtapes();
+      // Load all étapes with their photos for current player
+      console.log('🔍 Step 1: Loading étapes for player:', this.activePlayerId);
+      const etapes = await databaseService.getEtapesForPlayer(this.activePlayerId);
       console.log('✅ Étapes loaded:', etapes);
 
-      console.log('🔍 Step 2: Loading milestones...');
-      const milestones = await databaseService.getAllMilestones();
+      console.log('🔍 Step 2: Loading milestones for player:', this.activePlayerId);
+      const milestones = await databaseService.getMilestonesForPlayer(this.activePlayerId);
       console.log('✅ Milestones loaded:', milestones);
 
       if (etapes.length === 0 && milestones.length === 0) {
@@ -281,7 +373,7 @@ class VroomGridApp {
         // Show persistent toast with instructions
         Toast.error(
           '📍 Location Access Blocked\n\n' +
-          'Vroom Grid needs your location to track your adventure!\n\n' +
+          'Vrooom needs your location to track your adventure!\n\n' +
           'To enable:\n' +
           '1. Open Settings → Safari → Location\n' +
           '2. Select "While Using the App"\n' +
@@ -447,6 +539,7 @@ class VroomGridApp {
 
       // Save étape to database first
       const etapeId = await databaseService.saveEtape({
+        playerId: this.activePlayerId, // Link to current player
         distance: realCumulativeDistance,
         timestamp: photoData.timestamp,
         coords: {
@@ -463,6 +556,7 @@ class VroomGridApp {
 
       // Save photo to database (blobs stored directly - no conversion!)
       const photoId = await databaseService.savePhoto(etapeId, {
+        playerId: this.activePlayerId, // Link to current player
         timestamp: photoData.timestamp,
         imageBlob: photoData.imageBlob,
         thumbnailBlob: photoData.thumbnailBlob,
@@ -537,6 +631,7 @@ class VroomGridApp {
 
       // Save photo to database under the same étape
       const photoId = await databaseService.savePhoto(etapeId, {
+        playerId: this.activePlayerId, // Link to current player
         timestamp: photoData.timestamp,
         imageBlob: photoData.imageBlob,
         thumbnailBlob: photoData.thumbnailBlob,
@@ -1108,6 +1203,7 @@ class VroomGridApp {
       const exists = await databaseService.milestoneExists(milestone.distance);
       if (!exists) {
         await databaseService.saveMilestone({
+          playerId: this.activePlayerId, // Link to current player
           type: milestone.id,
           distance: milestone.distance,
           title: milestone.name,
@@ -1167,5 +1263,5 @@ class VroomGridApp {
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  new VroomGridApp();
+  new VrooomApp();
 });

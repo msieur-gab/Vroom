@@ -30,10 +30,21 @@ class DatabaseService {
 
     // Define schema
     // Syntax: '++' = auto-increment primary key, other fields = indexed fields
+
+    // Version 1: Original schema
     this.db.version(1).stores({
       etapes: '++id, distance, timestamp, latitude, longitude',
       photos: '++id, etapeId, timestamp',
       milestones: '++id, type, distance, unlocked, timestamp',
+      settings: 'key'
+    });
+
+    // Version 2: Add players and playerId foreign keys
+    this.db.version(2).stores({
+      players: '++id, name, created, isDefault',
+      etapes: '++id, playerId, distance, timestamp, latitude, longitude',
+      photos: '++id, etapeId, playerId, timestamp',
+      milestones: '++id, playerId, type, distance, unlocked, timestamp',
       settings: 'key'
     });
 
@@ -56,6 +67,7 @@ class DatabaseService {
     await this.ensureInitialized();
 
     const etape = {
+      playerId: etapeData.playerId, // REQUIRED: Player ID
       distance: etapeData.distance,
       timestamp: etapeData.timestamp || Date.now(),
       latitude: etapeData.coords?.latitude,
@@ -138,6 +150,7 @@ class DatabaseService {
 
     const photo = {
       etapeId: etapeId,
+      playerId: photoData.playerId, // REQUIRED: Player ID
       timestamp: photoData.timestamp || Date.now(),
       imageData: photoData.imageBlob,
       thumbnail: photoData.thumbnailBlob,
@@ -189,6 +202,7 @@ class DatabaseService {
     await this.ensureInitialized();
 
     const milestone = {
+      playerId: milestoneData.playerId, // REQUIRED: Player ID
       type: milestoneData.type,
       distance: milestoneData.distance,
       title: milestoneData.title,
@@ -329,6 +343,165 @@ class DatabaseService {
     await Dexie.delete('VroomDB');
     this.isInitialized = false;
     console.log('✅ Database deleted');
+  }
+
+  // ========================================
+  // Player Management Methods
+  // ========================================
+
+  /**
+   * Save a player
+   * @param {Object} playerData - Player data
+   * @returns {Promise<number>} Player ID
+   */
+  async savePlayer(playerData) {
+    await this.ensureInitialized();
+
+    const player = {
+      name: playerData.name || 'Driver',
+      avatar: playerData.avatar || null, // Blob or base64
+      color: playerData.color || '#FF5722',
+      created: Date.now(),
+      isDefault: playerData.isDefault || false
+    };
+
+    const id = await this.db.players.add(player);
+    console.log('💾 Player saved:', id, player.name);
+    return id;
+  }
+
+  /**
+   * Get a player by ID
+   * @param {number} playerId - Player ID
+   * @returns {Promise<Object>} Player data
+   */
+  async getPlayer(playerId) {
+    await this.ensureInitialized();
+    return await this.db.players.get(playerId);
+  }
+
+  /**
+   * Get all players
+   * @returns {Promise<Array>} Array of players
+   */
+  async getAllPlayers() {
+    await this.ensureInitialized();
+    return await this.db.players.toArray();
+  }
+
+  /**
+   * Get default player (first player or isDefault=true)
+   * @returns {Promise<Object|null>} Player data or null
+   */
+  async getDefaultPlayer() {
+    await this.ensureInitialized();
+
+    // Try to find player marked as default
+    let player = await this.db.players.where('isDefault').equals(true).first();
+
+    // If no default marked, get first player
+    if (!player) {
+      player = await this.db.players.orderBy('created').first();
+    }
+
+    return player;
+  }
+
+  /**
+   * Update player data
+   * @param {number} playerId - Player ID
+   * @param {Object} updates - Fields to update
+   */
+  async updatePlayer(playerId, updates) {
+    await this.ensureInitialized();
+    await this.db.players.update(playerId, updates);
+    console.log('💾 Player updated:', playerId);
+  }
+
+  /**
+   * Delete a player and all their data
+   * @param {number} playerId - Player ID
+   */
+  async deletePlayer(playerId) {
+    await this.ensureInitialized();
+
+    // Delete player's étapes
+    await this.db.etapes.where('playerId').equals(playerId).delete();
+
+    // Delete player's photos
+    await this.db.photos.where('playerId').equals(playerId).delete();
+
+    // Delete player's milestones
+    await this.db.milestones.where('playerId').equals(playerId).delete();
+
+    // Delete player
+    await this.db.players.delete(playerId);
+
+    console.log('💾 Player deleted:', playerId);
+  }
+
+  // ========================================
+  // Settings Methods
+  // ========================================
+
+  /**
+   * Get a setting value
+   * @param {string} key - Setting key
+   * @returns {Promise<any>} Setting value or null
+   */
+  async getSetting(key) {
+    await this.ensureInitialized();
+    const setting = await this.db.settings.get(key);
+    return setting ? setting.value : null;
+  }
+
+  /**
+   * Save a setting
+   * @param {string} key - Setting key
+   * @param {any} value - Setting value
+   */
+  async saveSetting(key, value) {
+    await this.ensureInitialized();
+    await this.db.settings.put({ key, value });
+    console.log('💾 Setting saved:', key, value);
+  }
+
+  /**
+   * Get étapes for a specific player
+   * @param {number} playerId - Player ID
+   * @returns {Promise<Array>} Array of étapes
+   */
+  async getEtapesForPlayer(playerId) {
+    await this.ensureInitialized();
+
+    const etapesWithKeys = [];
+    await this.db.etapes
+      .where('playerId')
+      .equals(playerId)
+      .sortBy('distance')
+      .then(etapes => {
+        etapes.forEach((etape, index) => {
+          etapesWithKeys.push({
+            id: etape.id,
+            ...etape
+          });
+        });
+      });
+
+    return etapesWithKeys;
+  }
+
+  /**
+   * Get milestones for a specific player
+   * @param {number} playerId - Player ID
+   * @returns {Promise<Array>} Array of milestones
+   */
+  async getMilestonesForPlayer(playerId) {
+    await this.ensureInitialized();
+    return await this.db.milestones
+      .where('playerId')
+      .equals(playerId)
+      .toArray();
   }
 
   /**

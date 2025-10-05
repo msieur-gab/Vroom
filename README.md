@@ -1,4 +1,4 @@
-# 🗺️ Vroom Grid - Orthogonal Travel Adventure
+# 🗺️ Vrooom - Orthogonal Travel Adventure
 
 A mobile-first Progressive Web Application that transforms travel photography into an engaging grid-based journey visualization. Each photo becomes a node on an orthogonal road network, creating a game-like representation of real-world adventures.
 
@@ -169,7 +169,7 @@ const MILESTONES = {
 
 ### Project Structure
 ```
-vroom-grid/
+vrooom/
 ├── src/
 │   ├── core/
 │   │   ├── TravelGrid.js      # Grid coordinate system
