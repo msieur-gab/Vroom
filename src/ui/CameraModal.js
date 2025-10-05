@@ -122,6 +122,25 @@ export class CameraModal {
       }
     } catch (error) {
       console.error('❌ Failed to start camera:', error);
+
+      // Provide helpful error messages based on error type
+      let userMessage = 'Failed to access camera.';
+
+      if (error.name === 'NotAllowedError') {
+        userMessage = '📷 Camera access was denied.\n\n' +
+          'To enable camera:\n' +
+          '1. Go to iPhone Settings\n' +
+          '2. Scroll down and tap Safari\n' +
+          '3. Tap Camera\n' +
+          '4. Select "Ask" or "Allow"\n' +
+          '5. Reload this page';
+      } else if (error.name === 'NotFoundError') {
+        userMessage = 'No camera found on this device.';
+      } else if (error.name === 'NotReadableError') {
+        userMessage = 'Camera is already in use by another app. Please close other camera apps and try again.';
+      }
+
+      error.message = userMessage;
       throw error;
     }
   }

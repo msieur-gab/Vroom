@@ -65,7 +65,29 @@ export class GeolocationService {
         },
         (error) => {
           console.error('❌ Geolocation error:', error);
-          reject(new Error(`Location access denied: ${error.message}`));
+
+          // Provide helpful error messages based on error code
+          let userMessage = 'Failed to get location.';
+
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              userMessage = '📍 Location access was denied.\n\n' +
+                'To enable location:\n' +
+                '1. Go to iPhone Settings\n' +
+                '2. Scroll down and tap Safari\n' +
+                '3. Tap Location\n' +
+                '4. Select "Ask" or "While Using"\n' +
+                '5. Reload this page';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              userMessage = 'Location information is unavailable. Please check that Location Services are enabled in Settings.';
+              break;
+            case error.TIMEOUT:
+              userMessage = 'Location request timed out. Please try again.';
+              break;
+          }
+
+          reject(new Error(userMessage));
         },
         {
           enableHighAccuracy: true,
