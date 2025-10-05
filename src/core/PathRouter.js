@@ -1,4 +1,4 @@
-import { GRID_CONFIG } from '../config.js';
+import { GridConfig } from '../config.js';
 
 /**
  * PathRouter - A* pathfinding with orthogonal constraints

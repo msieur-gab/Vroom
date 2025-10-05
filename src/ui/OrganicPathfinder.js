@@ -1,4 +1,4 @@
-import { GRID_CONFIG } from '../config.js';
+import { GridConfig } from '../config.js';
 
 /**
  * OrganicPathfinder - Creates smooth, curved serpentine paths
@@ -14,7 +14,7 @@ import { GRID_CONFIG } from '../config.js';
  */
 
 export class OrganicPathfinder {
-  constructor(cellSize, cellPadding, cellsPerRow, horizontalPadding = GRID_CONFIG.HORIZONTAL_PADDING) {
+  constructor(cellSize, cellPadding, cellsPerRow, horizontalPadding = GridConfig.horizontalPadding) {
     this.CELL_SIZE = cellSize;
     this.CELL_PADDING = cellPadding;
     this.CELLS_PER_ROW = cellsPerRow;

@@ -13,6 +13,7 @@ import { Toast } from './ui/Toast.js';
 import { i18n } from './i18n/i18n.js';
 import { ClusteringConfig } from './config.js';
 import { objectURLManager } from './utils/objectURLManager.js';
+import { validatePlayerName, validateDistance, validateCoordinates, validatePhotoBlob } from './utils/validation.js';
 import './ui/OnboardingFlow.js'; // Register web component
 
 class VrooomApp {
@@ -93,9 +94,17 @@ class VrooomApp {
       const { playerName, playerAvatar, playerColor, language } = e.detail;
 
       try {
+        // Validate player name
+        const nameValidation = validatePlayerName(playerName);
+        if (!nameValidation.valid) {
+          Toast.error(nameValidation.error);
+          console.error('❌ Invalid player name:', nameValidation.error);
+          return;
+        }
+
         // Create default player
         const playerId = await databaseService.savePlayer({
-          name: playerName,
+          name: playerName.trim(),
           avatar: playerAvatar,
           color: playerColor,
           isDefault: true
@@ -436,6 +445,32 @@ class VrooomApp {
       }
 
       const { imageBlob, thumbnailBlob, gpsPosition, hasGPS } = captureData;
+
+      // Validate photo blobs
+      const imageValidation = validatePhotoBlob(imageBlob);
+      if (!imageValidation.valid) {
+        Toast.error(imageValidation.error);
+        console.error('❌ Invalid image:', imageValidation.error);
+        if (loadingOverlay) loadingOverlay.classList.add('hidden');
+        return;
+      }
+
+      const thumbnailValidation = validatePhotoBlob(thumbnailBlob);
+      if (!thumbnailValidation.valid) {
+        Toast.error('Invalid thumbnail: ' + thumbnailValidation.error);
+        console.error('❌ Invalid thumbnail:', thumbnailValidation.error);
+        if (loadingOverlay) loadingOverlay.classList.add('hidden');
+        return;
+      }
+
+      // Validate GPS coordinates if provided
+      if (gpsPosition && hasGPS) {
+        const coordValidation = validateCoordinates(gpsPosition.latitude, gpsPosition.longitude);
+        if (!coordValidation.valid) {
+          Toast.warning('GPS coordinates invalid, photo will be saved without location');
+          console.warn('⚠️ Invalid GPS coordinates:', coordValidation.error);
+        }
+      }
 
       // Calculate distance traveled since last photo
       let tripDistance = 0;

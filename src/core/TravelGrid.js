@@ -1,4 +1,4 @@
-import { GRID_CONFIG } from '../config.js';
+import { GridConfig } from '../config.js';
 
 /**
  * TravelGrid - Core grid system for travel photo positioning
@@ -7,8 +7,8 @@ import { GRID_CONFIG } from '../config.js';
 export class TravelGrid {
   constructor(options = {}) {
     // Grid configuration
-    this.KM_PER_CELL = GRID_CONFIG.KM_PER_CELL;
-    this.CELLS_PER_ROW = GRID_CONFIG.CELLS_PER_ROW;
+    this.KM_PER_CELL = GridConfig.kmPerCell;
+    this.CELLS_PER_ROW = GridConfig.cellsPerRow;
     this.CELL_SIZE = options.cellSize || 80;
     
     // Data storage
