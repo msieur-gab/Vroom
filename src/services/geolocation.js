@@ -39,6 +39,30 @@ export class GeolocationService {
   }
 
   /**
+   * Check permission state (if supported by browser)
+   * @returns {Promise<string>} 'granted', 'denied', or 'prompt'
+   */
+  async checkPermission() {
+    if (!this.isSupported) {
+      return 'denied';
+    }
+
+    // Try to use Permissions API (not supported on all iOS versions)
+    if (navigator.permissions && navigator.permissions.query) {
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' });
+        return result.state; // 'granted', 'denied', or 'prompt'
+      } catch (error) {
+        // Permissions API not supported, fall back to testing
+        console.log('Permissions API not available, will test on demand');
+      }
+    }
+
+    // Fallback: Return 'prompt' - we'll know the real state when we try to access
+    return 'prompt';
+  }
+
+  /**
    * Get current GPS position
    * @param {Object} options - Geolocation options
    * @returns {Promise<Object>} Position data

@@ -51,6 +51,9 @@ class VroomGridApp {
     // Expose testing methods to window for dev console access
     this.exposeTestingMethods();
 
+    // Check permissions and show help if needed
+    await this.checkPermissions();
+
     console.log('🚀 Vroom Grid initialized successfully!');
     console.log('');
     console.log('🧪 Testing methods available:');
@@ -263,6 +266,35 @@ class VroomGridApp {
       console.log('✅ Settings button handler attached');
     } else {
       console.error('❌ Settings button not found');
+    }
+  }
+
+  /**
+   * Check location permission and show help if blocked
+   */
+  async checkPermissions() {
+    try {
+      const permissionState = await geolocationService.checkPermission();
+      console.log('📍 Location permission state:', permissionState);
+
+      if (permissionState === 'denied') {
+        // Show persistent toast with instructions
+        Toast.error(
+          '📍 Location Access Blocked\n\n' +
+          'Vroom Grid needs your location to track your adventure!\n\n' +
+          'To enable:\n' +
+          '1. Open Settings → Safari → Location\n' +
+          '2. Select "While Using the App"\n' +
+          '3. Reload this page',
+          {
+            duration: 0, // Don't auto-dismiss
+            tapToDismiss: true
+          }
+        );
+      }
+    } catch (error) {
+      console.warn('Could not check permission state:', error);
+      // Non-critical, continue app initialization
     }
   }
 
