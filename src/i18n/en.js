@@ -47,9 +47,7 @@ export default {
       description: 'Create your driver profile',
       namePlaceholder: 'Your name',
       nameDefault: 'Driver',
-      avatarSelfie: 'Take Selfie',
-      avatarUpload: 'Upload Photo',
-      avatarSkip: 'Skip (use colored icon)',
+      avatarHint: 'Tap to add photo',
       chooseColor: 'Choose your color:',
       colors: {
         blue: 'Blue',

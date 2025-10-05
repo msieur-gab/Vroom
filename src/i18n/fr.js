@@ -47,9 +47,7 @@ export default {
       description: 'Créez votre profil de conducteur',
       namePlaceholder: 'Votre nom',
       nameDefault: 'Conducteur',
-      avatarSelfie: 'Prendre un Selfie',
-      avatarUpload: 'Charger une Photo',
-      avatarSkip: 'Passer (utiliser une icône colorée)',
+      avatarHint: 'Appuyer pour ajouter une photo',
       chooseColor: 'Choisissez votre couleur :',
       colors: {
         blue: 'Bleu',

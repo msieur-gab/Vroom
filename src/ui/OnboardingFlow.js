@@ -79,9 +79,7 @@ class OnboardingFlow extends HTMLElement {
     grantGpsBtn?.addEventListener('click', () => this.requestGPSPermission());
 
     const playerNameInput = this.shadowRoot.getElementById('player-name');
-    const avatarUpload = this.shadowRoot.getElementById('avatar-upload');
-    const takeSelfieBtn = this.shadowRoot.getElementById('take-selfie-btn');
-    const skipAvatarBtn = this.shadowRoot.getElementById('skip-avatar-btn');
+    const avatarPreview = this.shadowRoot.getElementById('avatar-preview');
     const colorButtons = this.shadowRoot.querySelectorAll('.color-button');
 
     playerNameInput?.addEventListener('input', (e) => {
@@ -89,15 +87,14 @@ class OnboardingFlow extends HTMLElement {
       this.updateView();
     });
 
-    avatarUpload?.addEventListener('change', (e) => this.handleAvatarUpload(e));
-    takeSelfieBtn?.addEventListener('click', () => this.handleTakeSelfie());
-    skipAvatarBtn?.addEventListener('click', () => this.handleSkipAvatar());
+    avatarPreview?.addEventListener('click', () => this.handleTakeSelfie());
 
     colorButtons?.forEach(btn => {
       btn.addEventListener('click', (e) => {
         const color = e.currentTarget.dataset.color;
         this.state.playerColor = color;
         this.updateColorSelection();
+        this.updateAvatarPreview(); // Update avatar color immediately
       });
     });
   }
@@ -117,7 +114,12 @@ class OnboardingFlow extends HTMLElement {
       const reader = new FileReader();
       reader.onload = (event) => {
         this.state.playerAvatar = event.target.result;
-        this.updateView(); // Re-render to show avatar
+
+        // Update avatar preview directly
+        const avatarPreview = this.shadowRoot.getElementById('avatar-preview');
+        if (avatarPreview) {
+          avatarPreview.innerHTML = `<img src="${event.target.result}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+        }
       };
       reader.readAsDataURL(imageBlob);
 
@@ -140,31 +142,6 @@ class OnboardingFlow extends HTMLElement {
     }
   }
 
-  handleSkipAvatar() {
-    console.log('⏭️ Skipping avatar, using color icon');
-    this.state.playerAvatar = null;
-    this.updateView();
-  }
-
-  async handleAvatarUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        this.state.playerAvatar = e.target.result;
-        const preview = this.shadowRoot.getElementById('avatar-preview');
-        if (preview) {
-          preview.style.backgroundImage = `url('${e.target.result}')`;
-          preview.innerHTML = '';
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (error) {
-      console.error('Failed to process avatar:', error);
-    }
-  }
 
   updateColorSelection() {
     const buttons = this.shadowRoot.querySelectorAll('.color-button');
@@ -175,11 +152,11 @@ class OnboardingFlow extends HTMLElement {
   }
 
   setupBottomSheets() {
-    const panel = this.shadowRoot.getElementById('language-panel');
-    if (!panel) return;
+    const languagePanel = this.shadowRoot.getElementById('language-panel');
+    if (!languagePanel) return;
 
     const optionsList = this.shadowRoot.getElementById('language-options');
-    const closeBtn = panel.querySelector('.panel-close-btn');
+    const closeBtn = languagePanel.querySelector('.panel-close-btn');
 
     this.populateLanguageOptions(optionsList);
 
@@ -189,18 +166,17 @@ class OnboardingFlow extends HTMLElement {
         const locale = option.dataset.value;
         i18n.setLocale(locale);
         this.updateDisplayText('language-display', option.dataset.text);
-        this.closePanel(panel);
+        this.closePanel(languagePanel);
       }
     });
 
-    closeBtn?.addEventListener('click', () => this.closePanel(panel));
-    panel.addEventListener('click', (e) => {
-      if (e.target === panel) this.closePanel(panel);
+    closeBtn?.addEventListener('click', () => this.closePanel(languagePanel));
+    languagePanel.addEventListener('click', (e) => {
+      if (e.target === languagePanel) this.closePanel(languagePanel);
     });
 
-    // Trigger handler
     const trigger = this.shadowRoot.querySelector('[data-panel-target="language-panel"]');
-    trigger?.addEventListener('click', () => this.openPanel(panel));
+    trigger?.addEventListener('click', () => this.openPanel(languagePanel));
   }
 
   populateLanguageOptions(optionsList) {
@@ -404,8 +380,29 @@ class OnboardingFlow extends HTMLElement {
       nextButton.disabled = isDisabled;
     }
 
+    // Update avatar preview for step 6
+    if (this.state.currentStep === 6) {
+      this.updateAvatarPreview();
+    }
+
     // Update step-specific content
     this.updateStepContent();
+  }
+
+  updateAvatarPreview() {
+    const avatarPreview = this.shadowRoot.getElementById('avatar-preview');
+    if (!avatarPreview) return;
+
+    // Update background color
+    avatarPreview.style.backgroundColor = this.state.playerColor;
+
+    // Update content (photo or initial)
+    if (this.state.playerAvatar) {
+      avatarPreview.innerHTML = `<img src="${this.state.playerAvatar}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+    } else {
+      const initial = this.state.playerName.charAt(0).toUpperCase() || '?';
+      avatarPreview.innerHTML = initial;
+    }
   }
 
   updateStepContent() {
@@ -474,6 +471,7 @@ class OnboardingFlow extends HTMLElement {
           max-width: 428px;
           margin: auto;
           height: 100vh;
+          height: 100dvh; /* Dynamic viewport height for mobile browsers */
           background-color: #ffffff;
           display: flex;
           flex-direction: column;
@@ -482,17 +480,18 @@ class OnboardingFlow extends HTMLElement {
         }
 
         .onboarding-main {
-          flex-grow: 1;
+          flex: 1;
           display: flex;
           flex-direction: column;
-          padding: 2rem 1.5rem 1.5rem;
-          overflow: hidden;
+          padding: 2rem 1.5rem;
+          padding-bottom: calc(80px + env(safe-area-inset-bottom)); /* Space for fixed navigation */
+          overflow: hidden; /* No scrolling - content must fit */
         }
 
         .onboarding-step {
           display: flex;
           flex-direction: column;
-          flex-grow: 1;
+          height: 100%;
           justify-content: space-between;
         }
 
@@ -610,9 +609,26 @@ class OnboardingFlow extends HTMLElement {
           align-items: center;
           justify-content: center;
           font-size: 3rem;
-          color: #6b7280;
+          font-weight: 700;
+          color: white;
           margin-bottom: 0.75rem;
           border: 3px solid #e5e7eb;
+          transition: all 0.2s;
+        }
+
+        .avatar-preview.clickable {
+          cursor: pointer;
+        }
+
+        .avatar-preview.clickable:hover {
+          transform: scale(1.05);
+          border-color: #FF5722;
+        }
+
+        .avatar-hint {
+          font-size: 0.875rem;
+          color: #6b7280;
+          margin-bottom: 0.5rem;
         }
 
         .avatar-buttons {
@@ -810,17 +826,24 @@ class OnboardingFlow extends HTMLElement {
 
         /* Navigation */
         .navigation-container {
-          margin-top: auto;
-          flex-shrink: 0;
-          padding-top: 1.5rem;
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          max-width: 428px;
+          margin: 0 auto;
+          background: white;
+          border-top: 1px solid #e5e7eb;
+          padding: 1rem 1.5rem;
+          padding-bottom: calc(1rem + env(safe-area-inset-bottom)); /* iOS safe area */
+          z-index: 100;
+          box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
         }
 
         .navigation-wrapper {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          border-top: 1px solid #e5e7eb;
-          padding-top: 1.5rem;
         }
 
         .progress-dots {
@@ -968,18 +991,13 @@ class OnboardingFlow extends HTMLElement {
       <!-- Step 6: Player Profile -->
       <div id="step-6" class="onboarding-step hidden">
         <div class="avatar-container">
-          <div id="avatar-preview" class="avatar-preview" style="background-color: ${this.state.playerColor}">
+          <div id="avatar-preview" class="avatar-preview clickable" style="background-color: ${this.state.playerColor}">
             ${this.state.playerAvatar ?
               `<img src="${this.state.playerAvatar}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">` :
               `${this.state.playerName.charAt(0).toUpperCase() || '?'}`
             }
           </div>
-          <div class="avatar-buttons">
-            <button class="avatar-btn" id="take-selfie-btn" data-i18n="onboarding.step6.avatarSelfie">Take Selfie</button>
-            <label for="avatar-upload" class="avatar-btn" data-i18n="onboarding.step6.avatarUpload">Upload Photo</label>
-            <input type="file" id="avatar-upload" class="hidden-input" accept="image/*">
-            <button class="avatar-btn" id="skip-avatar-btn" data-i18n="onboarding.step6.avatarSkip">Skip</button>
-          </div>
+          <p class="avatar-hint" data-i18n="onboarding.step6.avatarHint">Tap to add photo</p>
         </div>
         <div class="bottom-content-container">
           <div class="step-header">

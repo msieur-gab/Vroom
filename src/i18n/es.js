@@ -47,9 +47,7 @@ export default {
       description: 'Crea tu perfil de conductor',
       namePlaceholder: 'Tu nombre',
       nameDefault: 'Conductor',
-      avatarSelfie: 'Tomar Selfie',
-      avatarUpload: 'Subir Foto',
-      avatarSkip: 'Saltar (usar icono de color)',
+      avatarHint: 'Toca para añadir foto',
       chooseColor: 'Elige tu color:',
       colors: {
         blue: 'Azul',

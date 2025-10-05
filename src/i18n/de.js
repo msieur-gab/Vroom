@@ -47,9 +47,7 @@ export default {
       description: 'Erstelle dein Fahrerprofil',
       namePlaceholder: 'Dein Name',
       nameDefault: 'Fahrer',
-      avatarSelfie: 'Selfie Aufnehmen',
-      avatarUpload: 'Foto Hochladen',
-      avatarSkip: 'Überspringen (farbiges Symbol verwenden)',
+      avatarHint: 'Tippen, um Foto hinzuzufügen',
       chooseColor: 'Wähle deine Farbe:',
       colors: {
         blue: 'Blau',
