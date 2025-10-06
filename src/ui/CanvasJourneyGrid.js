@@ -58,6 +58,9 @@ export class CanvasJourneyGrid {
     // Scenery renderer for decorative elements
     this.sceneryRenderer = new SceneryRenderer(this);
 
+    // Pattern textures for biome backgrounds (created lazily)
+    this.biomePatterns = null;
+
     // DOM overlay for interactive nodes
     this.nodeOverlay = null;
     
@@ -268,12 +271,97 @@ export class CanvasJourneyGrid {
   }
   
   /**
+   * Create pattern textures for biome backgrounds
+   * Generates small repeating patterns (dots, crosses, etc.)
+   */
+  createBiomePatterns() {
+    const patterns = {};
+
+    // Dot pattern (for forest/plains)
+    const dotCanvas = document.createElement('canvas');
+    dotCanvas.width = 24;
+    dotCanvas.height = 24;
+    const dotCtx = dotCanvas.getContext('2d');
+    dotCtx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+    dotCtx.beginPath();
+    dotCtx.arc(6, 6, 1.5, 0, Math.PI * 2);
+    dotCtx.fill();
+    dotCtx.beginPath();
+    dotCtx.arc(18, 18, 1.5, 0, Math.PI * 2);
+    dotCtx.fill();
+    patterns.dots = this.ctx.createPattern(dotCanvas, 'repeat');
+
+    // Cross pattern (for desert) - small + shapes
+    const crossCanvas = document.createElement('canvas');
+    crossCanvas.width = 25;
+    crossCanvas.height = 25;
+    const crossCtx = crossCanvas.getContext('2d');
+    crossCtx.strokeStyle = 'rgba(0, 0, 0, 0.10)';
+    crossCtx.lineWidth = 1.5;
+    crossCtx.lineCap = 'square';  // Square ends for sharp + shape
+    // Draw small cross (+) shape
+    crossCtx.beginPath();
+    // Vertical line (6px tall)
+    crossCtx.moveTo(12.5, 9.5);
+    crossCtx.lineTo(12.5, 15.5);
+    // Horizontal line (6px wide)
+    crossCtx.moveTo(9.5, 12.5);
+    crossCtx.lineTo(15.5, 12.5);
+    crossCtx.stroke();
+    patterns.crosses = this.ctx.createPattern(crossCanvas, 'repeat');
+
+    // Diagonal lines (for mountains)
+    const diagonalCanvas = document.createElement('canvas');
+    diagonalCanvas.width = 16;
+    diagonalCanvas.height = 16;
+    const diagCtx = diagonalCanvas.getContext('2d');
+    diagCtx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
+    diagCtx.lineWidth = 1;
+    diagCtx.beginPath();
+    diagCtx.moveTo(0, 16);
+    diagCtx.lineTo(16, 0);
+    diagCtx.stroke();
+    patterns.diagonal = this.ctx.createPattern(diagonalCanvas, 'repeat');
+
+    // Small circles (for snow)
+    const circleCanvas = document.createElement('canvas');
+    circleCanvas.width = 30;
+    circleCanvas.height = 30;
+    const circleCtx = circleCanvas.getContext('2d');
+    circleCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    circleCtx.lineWidth = 1;
+    circleCtx.beginPath();
+    circleCtx.arc(8, 8, 3, 0, Math.PI * 2);
+    circleCtx.stroke();
+    circleCtx.beginPath();
+    circleCtx.arc(22, 22, 2, 0, Math.PI * 2);
+    circleCtx.stroke();
+    patterns.circles = this.ctx.createPattern(circleCanvas, 'repeat');
+
+    return patterns;
+  }
+
+  /**
    * Draw biome background colors based on distance/height
    * Creates immersive environmental zones that change as you scroll
    */
   drawBiomeBackgrounds(visibleTop, visibleBottom) {
+    // Create patterns lazily on first draw
+    if (!this.biomePatterns) {
+      this.biomePatterns = this.createBiomePatterns();
+    }
+
     // Get biome definitions from SceneryRenderer
     const biomes = this.sceneryRenderer.biomes;
+
+    // Map biome names to patterns
+    const biomePatternMap = {
+      'forest': 'dots',
+      'plains': 'dots',
+      'desert': 'crosses',
+      'mountain': 'diagonal',
+      'snow': 'circles'
+    };
 
     // Calculate which biomes are visible in viewport
     for (let i = 0; i < biomes.length; i++) {
@@ -316,6 +404,14 @@ export class CanvasJourneyGrid {
       } else {
         // No transition, just solid color
         this.ctx.fillStyle = biome.bgColor;
+        this.ctx.fillRect(0, drawStartY, this.canvas.width, drawHeight);
+      }
+
+      // Add pattern overlay (subtle texture)
+      const patternName = biomePatternMap[biome.name] || 'dots';
+      const pattern = this.biomePatterns[patternName];
+      if (pattern) {
+        this.ctx.fillStyle = pattern;
         this.ctx.fillRect(0, drawStartY, this.canvas.width, drawHeight);
       }
     }
