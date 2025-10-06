@@ -3,14 +3,13 @@ import { GridConfig } from '../config.js';
 /**
  * OrganicPathfinder - Creates smooth, curved serpentine paths
  *
- * Unlike OrthogonalPathfinder which uses right angles with rounded corners,
- * this creates flowing, organic curves using Bézier curves and splines.
+ * Creates flowing, organic curves using semicircular arcs (compass method).
  *
  * Key features:
- * - Large U-turn curves at row ends
- * - Smooth flow through node positions
+ * - Large U-turn curves at row ends using perfect semicircles
+ * - Smooth flow through node positions at cell centers
  * - Natural, road-like appearance
- * - Curves extend beyond grid boundaries for organic feel
+ * - Waypoints positioned at cell centers for consistent geometry
  */
 
 export class OrganicPathfinder {
@@ -70,69 +69,59 @@ export class OrganicPathfinder {
   /**
    * Add a U-turn using ONE semicircle spanning two rows
    *
-   * The semicircle connects boundary waypoints (at edges of cells 2 and 4)
-   * For right turns (even rows): curves through cell 5 (rightmost)
-   * For left turns (odd rows): curves through cell 1 (leftmost)
+   * COMPASS METHOD:
+   * The semicircle is constructed using the "compass method" - imagine placing a compass
+   * at the midpoint between entry and exit waypoints, with radius set to half the distance
+   * between them. This creates a perfect semicircle that naturally curves through the
+   * appropriate arc cell (leftmost or rightmost).
    *
-   * curr = exit point of current row (right edge of cell 4, or left edge of cell 2)
-   * next = entry point of next row (left edge of cell 2, or right edge of cell 4)
+   * For right turns (even rows): curves through rightmost cell (cell 4)
+   * For left turns (odd rows): curves through leftmost cell (cell 0)
+   *
+   * @param curr - Exit waypoint of current row (at arc cell center)
+   * @param next - Entry waypoint of next row (at arc cell center)
    */
   addUTurnCurve(path, curr, next, prev, nextNext) {
     const currRow = Math.floor(curr.y / (this.CELL_SIZE + this.CELL_PADDING));
     const isEvenRow = currRow % 2 === 0;
 
-    // Calculate the radius based on the diagonal distance between entry/exit points
+    // STEP 1: Calculate diagonal distance between entry and exit waypoints
     const dx = next.x - curr.x;
     const dy = next.y - curr.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // For a semicircle connecting these two points, radius = distance / 2
+    // STEP 2: Radius of semicircle = half the distance between waypoints
+    // This is the key insight of the compass method
     const radius = distance / 2;
 
-    // Center point is at the midpoint between curr and next
+    // STEP 3: Center point of the semicircle = midpoint between waypoints
+    // This ensures the arc passes exactly through both waypoints
     const centerX = (curr.x + next.x) / 2;
     const centerY = (curr.y + next.y) / 2;
 
-    // Calculate start and end angles based on the positions
-    if (isEvenRow) {
-      // RIGHT turn (even row):
-      // curr is at right edge of cell 4, next is at left edge of cell 2 (next row)
-      // Arc curves through cell 5 on the right
-      const startAngle = Math.atan2(curr.y - centerY, curr.x - centerX);
-      const endAngle = Math.atan2(next.y - centerY, next.x - centerX);
+    // STEP 4: Calculate angles from center to waypoints using atan2
+    // atan2(dy, dx) returns the angle in radians from the positive X-axis
+    const startAngle = Math.atan2(curr.y - centerY, curr.x - centerX);
+    const endAngle = Math.atan2(next.y - centerY, next.x - centerX);
 
-      // Draw arc clockwise from curr to next
+    // STEP 5: Draw the arc in the appropriate direction
+    if (isEvenRow) {
+      // RIGHT turn (even row → odd row):
+      // Arc curves clockwise (false) through the rightmost cell
       path.arc(centerX, centerY, radius, startAngle, endAngle, false);
     } else {
-      // LEFT turn (odd row):
-      // curr is at left edge of cell 2, next is at right edge of cell 4 (next row)
-      // Arc curves through cell 1 on the left
-      const startAngle = Math.atan2(curr.y - centerY, curr.x - centerX);
-      const endAngle = Math.atan2(next.y - centerY, next.x - centerX);
-
-      // Draw arc counter-clockwise from curr to next (opposite direction from right turn)
+      // LEFT turn (odd row → even row):
+      // Arc curves counter-clockwise (true) through the leftmost cell
       path.arc(centerX, centerY, radius, startAngle, endAngle, true);
     }
   }
 
   /**
    * Add smooth segment for horizontal connections (same row)
+   * Currently uses straight lines - could be enhanced with gentle curves
    */
   addSmoothSegment(path, curr, next, prev, nextNext) {
-    // For horizontal segments, use gentle curves through the points
-    // Calculate control points based on neighboring points for continuity
-
-    const dx = next.x - curr.x;
-    const dy = next.y - curr.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    // Use quadratic curve for gentle smoothing
-    // Control point at midpoint with slight vertical offset for organic feel
-    const tension = 0.3; // How much the curve deviates from straight line
-    const cpx = (curr.x + next.x) / 2;
-    const cpy = (curr.y + next.y) / 2;
-
-    // For now, simple line (we can enhance with gentle curves later)
+    // Simple straight line connection for same-row nodes
     path.lineTo(next.x, next.y);
   }
 
@@ -144,13 +133,20 @@ export class OrganicPathfinder {
     if (nodes.length === 0) return [];
 
     const waypoints = [];
+    const addWaypoint = (point) => {
+      if (!point) return;
+      const last = waypoints[waypoints.length - 1];
+      if (!last || last.x !== point.x || last.y !== point.y) {
+        waypoints.push(point);
+      }
+    };
 
     // Start at first node - always use cell center
     const firstNode = nodes[0];
     const firstCol = firstNode.coords.col;
     const firstRow = firstNode.coords.row;
 
-    waypoints.push(this.getCellCenter(firstRow, firstCol));
+    addWaypoint(this.getCellCenter(firstRow, firstCol));
 
     // For each pair of consecutive nodes
     for (let i = 0; i < nodes.length - 1; i++) {
@@ -163,7 +159,15 @@ export class OrganicPathfinder {
 
       // Same row - just add destination cell center
       if (fromRow === toRow) {
-        waypoints.push(this.getCellCenter(toRow, toCol));
+        addWaypoint(this.getCellCenter(toRow, toCol));
+        continue;
+      }
+
+      // Adjacent rows with shared column - align vertically instead of forcing edge arcs
+      if (this.shouldUseAlignedColumnTransition(fromNode, toNode)) {
+        const alignedWaypoints = this.getAlignedColumnWaypoints(fromNode, toNode);
+        alignedWaypoints.forEach(addWaypoint);
+        addWaypoint(this.getCellCenter(toRow, toCol));
         continue;
       }
 
@@ -175,7 +179,7 @@ export class OrganicPathfinder {
 
       if (fromCol !== fromArcCol) {
         // Need to travel to arc cell center
-        waypoints.push(this.getCellCenter(fromRow, fromArcCol));
+        addWaypoint(this.getCellCenter(fromRow, fromArcCol));
       }
 
       // Add waypoints for each intermediate row
@@ -184,50 +188,77 @@ export class OrganicPathfinder {
 
         // Entry point: center of arc cell (cell 0 or cell 4)
         const entryArcCol = isEvenRow ? 0 : (this.CELLS_PER_ROW - 1); // Cell 0 or Cell 4
-        waypoints.push(this.getCellCenter(row, entryArcCol));
+        addWaypoint(this.getCellCenter(row, entryArcCol));
 
         // Exit point: center of arc cell (cell 0 or cell 4)
         const exitArcCol = isEvenRow ? (this.CELLS_PER_ROW - 1) : 0; // Cell 4 or Cell 0
-        waypoints.push(this.getCellCenter(row, exitArcCol));
+        addWaypoint(this.getCellCenter(row, exitArcCol));
       }
 
       // Add waypoint at CENTER of arc cell in destination row
       const isToEvenRow = toRow % 2 === 0;
       const toArcCol = isToEvenRow ? 0 : (this.CELLS_PER_ROW - 1); // Cell 0 or Cell 4
-      waypoints.push(this.getCellCenter(toRow, toArcCol));
+      addWaypoint(this.getCellCenter(toRow, toArcCol));
 
       // Add destination node center
-      waypoints.push(this.getCellCenter(toRow, toCol));
+      addWaypoint(this.getCellCenter(toRow, toCol));
     }
 
     return waypoints;
   }
 
   /**
-   * Get boundary point between arc cells (1, 5) and straight path cells (2, 3, 4)
-   * @param {number} row - Row index
-   * @param {number} col - Column index (should be 1 for left boundary, 3 for right boundary)
-   * @param {boolean} isRightEdge - True for right edge of cell, false for left edge
-   *
-   * Cell 1 (leftmost) and Cell 5 (rightmost) are reserved for arcs
-   * Waypoints should be at:
-   * - Right edge of cell 2 (boundary between cells 2-3) for left entry
-   * - Left edge of cell 4 (boundary between cells 3-4) for right entry
+   * Determine if two nodes should align vertically during a row transition
+   * rather than travelling to the serpentine arc columns.
    */
-  getCellBoundary(row, col, isRightEdge) {
-    const baseX = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
-    const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
+  shouldUseAlignedColumnTransition(fromNode, toNode) {
+    const fromRow = fromNode.coords.row;
+    const toRow = toNode.coords.row;
+    const fromCol = fromNode.coords.col;
+    const toCol = toNode.coords.col;
 
-    if (isRightEdge) {
-      // Right edge of the cell (before entering cell 5 for right turns)
-      const x = baseX + this.CELL_SIZE;
-      return { x, y, row, col };
-    } else {
-      // Left edge of the cell (after exiting cell 1 for left turns)
-      const x = baseX;
-      return { x, y, row, col };
+    const rowDelta = Math.abs(toRow - fromRow);
+    if (rowDelta !== 1) return false; // Only adjust adjacent rows to preserve serpentine flow
+
+    const fromDefaultArcCol = fromRow % 2 === 0 ? (this.CELLS_PER_ROW - 1) : 0;
+    const toDefaultArcCol = toRow % 2 === 0 ? 0 : (this.CELLS_PER_ROW - 1);
+
+    // If both nodes are already sitting on their default arc columns, keep the existing behaviour
+    if (fromCol === fromDefaultArcCol && toCol === toDefaultArcCol) {
+      return false;
     }
+
+    const toRowDirection = toRow % 2 === 0 ? 1 : -1; // Even rows move left ➝ right, odd rows right ➝ left
+    const relativeDirection = (toCol - fromCol) * toRowDirection;
+
+    // Only align vertically if the destination node sits ahead (or directly below) in the row's flow direction
+    if (relativeDirection < 0) {
+      return false;
+    }
+
+    return true;
   }
+
+  /**
+   * Build waypoints that keep the transition vertical through a shared column.
+   */
+  getAlignedColumnWaypoints(fromNode, toNode) {
+    const alignedWaypoints = [];
+    const fromRow = fromNode.coords.row;
+    const toRow = toNode.coords.row;
+    const sharedCol = fromNode.coords.col;
+
+    const step = toRow > fromRow ? 1 : -1;
+    for (let row = fromRow + step; row !== toRow; row += step) {
+      alignedWaypoints.push(this.getCellCenter(row, sharedCol));
+    }
+
+    // Encourage the path to enter the destination row through the shared column
+    alignedWaypoints.push(this.getCellCenter(toRow, sharedCol));
+
+    return alignedWaypoints;
+  }
+
 
   /**
    * Get center point of a cell by row/col
@@ -235,7 +266,7 @@ export class OrganicPathfinder {
   getCellCenter(row, col) {
     const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
     const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
-    return { x, y, row, col };
+    return { x, y };
   }
 
   /**

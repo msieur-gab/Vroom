@@ -1,4 +1,3 @@
-import { OrthogonalPathfinder } from './OrthogonalPathfinder.js';
 import { OrganicPathfinder } from './OrganicPathfinder.js';
 import { NodeComponent } from './NodeComponent.js';
 import { GridConfig } from '../config.js';
@@ -32,10 +31,16 @@ export class CanvasJourneyGrid {
     this.nodes = new Map(); // distance -> node data
     this.nodeComponents = new Map(); // distance -> NodeComponent instances
     this.maxDistance = 0;
-    
-    // Pathfinding - toggle between styles
-    this.useOrganicPaths = true; // Set to false for orthogonal paths
-    this.orthogonalPathfinder = new OrthogonalPathfinder();
+
+    // Path rendering cache - recalculated only when nodes change
+    this.pathCache = {
+      sortedNodes: null,
+      waypoints: null,
+      organicPath: null,
+      isDirty: true
+    };
+
+    // Organic pathfinder for smooth serpentine roads
     this.organicPathfinder = new OrganicPathfinder(
       this.CELL_SIZE,
       this.CELL_PADDING,
@@ -189,31 +194,34 @@ export class CanvasJourneyGrid {
    */
   addNode(distance, nodeData = {}) {
     const coords = this.distanceToCoords(distance);
-    
+
     // Determine node type
     const isStart = distance === 0 && !nodeData.type;
-    
+
     const node = {
       distance,
       coords,
       data: nodeData,
       type: nodeData.type || (isStart ? 'start' : 'regular')
     };
-    
+
     this.nodes.set(distance, node);
     this.maxDistance = Math.max(this.maxDistance, distance);
-    
+
+    // Invalidate path cache since nodes changed
+    this.pathCache.isDirty = true;
+
     // Create interactive NodeComponent for journey and milestone nodes
     if (node.type === 'journey' || node.type === 'milestone' || (node.type === 'regular' && !nodeData.isMilestone)) {
       this.createInteractiveNode(node);
     }
-    
+
     // Update canvas size if needed
     this.updateCanvasSize();
-    
+
     // Redraw
     this.redraw();
-    
+
     console.log(`🎨 Added ${node.type} node at ${distance}km → (${coords.row}, ${coords.col})`);
     return node;
   }
@@ -283,11 +291,36 @@ export class CanvasJourneyGrid {
   }
 
   /**
-   * Draw orthogonal roads using grid-based pathfinding
+   * Draw roads using cached paths (recalculated only when nodes change)
    */
   drawRoads(visibleTop, visibleBottom) {
+    // Rebuild cache if dirty (nodes added/removed/repositioned)
+    if (this.pathCache.isDirty) {
+      this.rebuildPathCache();
+    }
+
+    if (!this.pathCache.sortedNodes || this.pathCache.sortedNodes.length < 2) {
+      return;
+    }
+
+    this.ctx.lineCap = 'round';
+    this.ctx.lineJoin = 'round';
+
+    // Draw cached organic path
+    this.drawOrganicPath(this.pathCache.organicPath);
+
+    // DEBUG: Draw red dots at waypoints
+    this.drawWaypointDebug(this.pathCache.waypoints);
+  }
+
+  /**
+   * Rebuild path cache - called only when nodes change
+   */
+  rebuildPathCache() {
+    console.log('🔄 Rebuilding path cache...');
+
     // Sort nodes in SERPENTINE ORDER, not by distance!
-    const sortedNodes = Array.from(this.nodes.values())
+    this.pathCache.sortedNodes = Array.from(this.nodes.values())
       .sort((a, b) => {
         // Calculate serpentine cell index for proper ordering
         const cellA = this.getSerpentineCellIndex(a.coords.row, a.coords.col);
@@ -295,106 +328,21 @@ export class CanvasJourneyGrid {
         return cellA - cellB;
       });
 
-    if (sortedNodes.length < 2) return;
-
-    this.ctx.lineCap = 'round';
-    this.ctx.lineJoin = 'round';
-
-    // Use organic or orthogonal paths based on setting
-    if (this.useOrganicPaths) {
-      // Generate waypoints for debugging
-      const waypoints = this.organicPathfinder.generateOrganicWaypoints(sortedNodes);
-
-      // Draw the organic path
-      const organicPath = this.organicPathfinder.createOrganicSerpentinePath(sortedNodes);
-      this.drawOrganicPath(organicPath);
-
-      // DEBUG: Draw red dots at waypoints
-      this.drawWaypointDebug(waypoints);
-    } else {
-      // Generate complete serpentine path with waypoints
-      const fullPath = this.generateFullSerpentinePath(sortedNodes);
-      console.log(`🛣️ Drawing full serpentine path through ${fullPath.length} waypoints`);
-
-      // Draw the complete path
-      if (fullPath && fullPath.length > 1) {
-        this.drawOrthogonalPath(fullPath, false);
-      }
+    if (this.pathCache.sortedNodes.length < 2) {
+      this.pathCache.isDirty = false;
+      return;
     }
+
+    // Generate waypoints for organic path
+    this.pathCache.waypoints = this.organicPathfinder.generateOrganicWaypoints(this.pathCache.sortedNodes);
+
+    // Generate organic Path2D
+    this.pathCache.organicPath = this.organicPathfinder.createOrganicSerpentinePath(this.pathCache.sortedNodes);
+
+    this.pathCache.isDirty = false;
+    console.log(`✅ Path cache rebuilt: ${this.pathCache.sortedNodes.length} nodes, ${this.pathCache.waypoints.length} waypoints`);
   }
 
-  /**
-   * Generate complete serpentine path including waypoints at row ends
-   */
-  generateFullSerpentinePath(sortedNodes) {
-    if (sortedNodes.length === 0) return [];
-
-    const waypoints = [];
-    const firstNode = sortedNodes[0];
-    const lastNode = sortedNodes[sortedNodes.length - 1];
-
-    // Start at first node
-    waypoints.push(this.getNodeCenter(firstNode));
-
-    // For each pair of consecutive nodes, fill in the serpentine path
-    for (let i = 0; i < sortedNodes.length - 1; i++) {
-      const fromNode = sortedNodes[i];
-      const toNode = sortedNodes[i + 1];
-
-      // Add intermediate waypoints for the serpentine flow
-      const intermediates = this.getSerpentineWaypoints(fromNode, toNode);
-      waypoints.push(...intermediates);
-
-      // Add the next node
-      waypoints.push(this.getNodeCenter(toNode));
-    }
-
-    return waypoints;
-  }
-
-  /**
-   * Get serpentine waypoints between two nodes
-   */
-  getSerpentineWaypoints(fromNode, toNode) {
-    const waypoints = [];
-    const fromRow = fromNode.coords.row;
-    const toRow = toNode.coords.row;
-    const fromCol = fromNode.coords.col;
-    const toCol = toNode.coords.col;
-
-    // Same row - no waypoints needed
-    if (fromRow === toRow) {
-      return waypoints;
-    }
-
-    // Different rows - need to traverse serpentine pattern
-    const isFromEvenRow = fromRow % 2 === 0;
-
-    // Add waypoint at end of fromNode's row
-    const fromRowEndCol = isFromEvenRow ? 4 : 0;
-    if (fromCol !== fromRowEndCol) {
-      waypoints.push(this.getCellCenter(fromRow, fromRowEndCol));
-    }
-
-    // Add waypoints for each intermediate row
-    for (let row = fromRow + 1; row < toRow; row++) {
-      const isEvenRow = row % 2 === 0;
-      const startCol = isEvenRow ? 0 : 4;
-      const endCol = isEvenRow ? 4 : 0;
-
-      waypoints.push(this.getCellCenter(row, startCol));
-      waypoints.push(this.getCellCenter(row, endCol));
-    }
-
-    // Add waypoint at start of toNode's row
-    const isToEvenRow = toRow % 2 === 0;
-    const toRowStartCol = isToEvenRow ? 0 : 4;
-    if (toCol !== toRowStartCol) {
-      waypoints.push(this.getCellCenter(toRow, toRowStartCol));
-    }
-
-    return waypoints;
-  }
 
   /**
    * Get center point of a cell
@@ -538,92 +486,6 @@ export class CanvasJourneyGrid {
     });
   }
 
-  /**
-   * Draw orthogonal path with rounded corners
-   */
-  drawOrthogonalPath(pathPoints, isDashed = false) {
-    if (pathPoints.length < 2) return;
-    
-    const ctx = this.ctx;
-    const cornerRadius = 15;
-    
-    // Create smooth path with rounded corners
-    const smoothPath = this.createSmoothOrthogonalPath(pathPoints, cornerRadius);
-    
-    // Draw road layers
-    // Shadow
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 8;
-    ctx.globalAlpha = 0.3;
-    ctx.stroke(smoothPath);
-    
-    // Surface
-    ctx.strokeStyle = '#666';
-    ctx.lineWidth = 6;
-    ctx.globalAlpha = 0.8;
-    ctx.stroke(smoothPath);
-    
-    // Center line (dashed for first segment only)
-    if (isDashed) {
-      ctx.strokeStyle = '#FFF';
-      ctx.lineWidth = 1;
-      ctx.globalAlpha = 0.9;
-      ctx.setLineDash([8, 12]);
-      ctx.stroke(smoothPath);
-      ctx.setLineDash([]);
-    }
-    
-    ctx.globalAlpha = 1.0;
-  }
-  
-  /**
-   * Create smooth orthogonal path with rounded corners
-   */
-  createSmoothOrthogonalPath(points, radius) {
-    const path = new Path2D();
-    
-    if (points.length === 0) return path;
-    
-    path.moveTo(points[0].x, points[0].y);
-    
-    for (let i = 1; i < points.length - 1; i++) {
-      const prev = points[i - 1];
-      const curr = points[i];
-      const next = points[i + 1];
-      
-      // Calculate corner rounding
-      const d1 = Math.sqrt((curr.x - prev.x) ** 2 + (curr.y - prev.y) ** 2);
-      const d2 = Math.sqrt((next.x - curr.x) ** 2 + (next.y - curr.y) ** 2);
-      const maxRadius = Math.min(radius, d1 / 2, d2 / 2);
-      
-      if (maxRadius > 0) {
-        // Calculate rounded corner points
-        const ratio1 = maxRadius / d1;
-        const ratio2 = maxRadius / d2;
-        
-        const startX = curr.x - ratio1 * (curr.x - prev.x);
-        const startY = curr.y - ratio1 * (curr.y - prev.y);
-        const endX = curr.x + ratio2 * (next.x - curr.x);
-        const endY = curr.y + ratio2 * (next.y - curr.y);
-        
-        // Line to corner start
-        path.lineTo(startX, startY);
-        
-        // Rounded corner
-        path.quadraticCurveTo(curr.x, curr.y, endX, endY);
-      } else {
-        // Sharp corner
-        path.lineTo(curr.x, curr.y);
-      }
-    }
-    
-    // Line to final point
-    if (points.length > 1) {
-      path.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-    }
-    
-    return path;
-  }
   
   /**
    * Create an interactive NodeComponent for journey and milestone nodes
@@ -675,11 +537,14 @@ export class CanvasJourneyGrid {
   clearNodes() {
     // Clear canvas nodes
     this.nodes.clear();
-    
+
     // Clear and destroy NodeComponents
     this.nodeComponents.forEach(component => component.destroy());
     this.nodeComponents.clear();
-    
+
+    // Invalidate path cache
+    this.pathCache.isDirty = true;
+
     this.maxDistance = 0;
     this.updateCanvasSize();
     this.redraw();
@@ -715,6 +580,9 @@ export class CanvasJourneyGrid {
         component.updatePosition();
       }
     });
+
+    // Invalidate path cache since positions changed
+    this.pathCache.isDirty = true;
   }
 
   /**
