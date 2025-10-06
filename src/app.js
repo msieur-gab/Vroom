@@ -112,12 +112,15 @@ class VrooomApp {
 
         console.log('💾 Default player created:', playerId);
 
+        // Set active player immediately
+        this.activePlayerId = playerId;
+
+        // Set player name for i18n personalization (before any async operations)
+        i18n.setPlayerName(playerName.trim());
+
         // Save onboarding settings
         await databaseService.saveSetting('onboarding_complete', true);
         await databaseService.saveSetting('language', language);
-
-        // Set active player
-        this.activePlayerId = playerId;
 
         // Remove onboarding UI
         onboardingFlow.remove();
