@@ -1,5 +1,6 @@
 import { OrganicPathfinder } from './OrganicPathfinder.js';
 import { NodeComponent } from './NodeComponent.js';
+import { SceneryRenderer } from './SceneryRenderer.js';
 import { GridConfig } from '../config.js';
 
 /**
@@ -47,7 +48,10 @@ export class CanvasJourneyGrid {
       this.CELLS_PER_ROW,
       this.HORIZONTAL_PADDING
     );
-    
+
+    // Scenery renderer for decorative elements
+    this.sceneryRenderer = new SceneryRenderer(this);
+
     // DOM overlay for interactive nodes
     this.nodeOverlay = null;
     
@@ -306,6 +310,9 @@ export class CanvasJourneyGrid {
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
 
+    // Draw scenery BEFORE the road (so road appears on top)
+    this.sceneryRenderer.drawDecorations(this.ctx, visibleTop, visibleBottom);
+
     // Draw cached organic path
     this.drawOrganicPath(this.pathCache.organicPath);
 
@@ -338,6 +345,9 @@ export class CanvasJourneyGrid {
 
     // Generate organic Path2D
     this.pathCache.organicPath = this.organicPathfinder.createOrganicSerpentinePath(this.pathCache.sortedNodes);
+
+    // Generate scenery decorations (pass waypoints to detect traversed cells)
+    this.sceneryRenderer.generateDecorations(this.pathCache.sortedNodes, this.pathCache.waypoints);
 
     this.pathCache.isDirty = false;
     console.log(`✅ Path cache rebuilt: ${this.pathCache.sortedNodes.length} nodes, ${this.pathCache.waypoints.length} waypoints`);
@@ -541,6 +551,9 @@ export class CanvasJourneyGrid {
     // Clear and destroy NodeComponents
     this.nodeComponents.forEach(component => component.destroy());
     this.nodeComponents.clear();
+
+    // Clear scenery decorations
+    this.sceneryRenderer.clear();
 
     // Invalidate path cache
     this.pathCache.isDirty = true;
