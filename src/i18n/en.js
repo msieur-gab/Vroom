@@ -154,7 +154,8 @@ export default {
       mood: 'Mood',
       status: 'Status',
       rarity: 'Rarity',
-      images: 'Photos'
+      images: 'Photos',
+      fullImage: 'Full Image'
     }
   }
 };

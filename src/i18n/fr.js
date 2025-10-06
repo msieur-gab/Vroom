@@ -154,7 +154,8 @@ export default {
       mood: 'Humeur',
       status: 'Statut',
       rarity: 'Rareté',
-      images: 'Photos'
+      images: 'Photos',
+      fullImage: 'Image Complète'
     }
   }
 };

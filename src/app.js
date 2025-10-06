@@ -286,8 +286,10 @@ class VrooomApp {
         // Mark milestone as unlocked in engine
         this.milestoneEngine.unlockMilestone(milestone.distance);
 
-        // Use a tiny offset for visual distance to prevent overlap
-        const visualDistance = milestone.distance > 0 ? milestone.distance - 0.01 : 0;
+        // Calculate proper cell position for milestone
+        // Milestones should appear in the middle of their target cell
+        const targetCell = Math.floor(milestone.distance / this.canvasGrid.KM_PER_CELL);
+        const visualDistance = (targetCell * this.canvasGrid.KM_PER_CELL) + (this.canvasGrid.KM_PER_CELL / 2);
 
         // Prepare milestone data with schema-compatible fields
         const milestoneData = {
@@ -901,8 +903,12 @@ class VrooomApp {
   async addMilestoneNode(milestone) {
     console.log(`🎨 Adding milestone node: ${milestone.name} at ${milestone.distance}km`);
 
-    // Use a tiny offset for the distance to prevent overwriting a user node at the exact same location in the canvas map.
-    const visualDistance = milestone.distance > 0 ? milestone.distance - 0.01 : 0;
+    // Calculate proper cell position for milestone
+    // Milestones should appear in the middle of their target cell
+    const { KM_PER_CELL } = this.canvasGrid;
+    const targetCell = Math.floor(milestone.distance / KM_PER_CELL);
+    // Place milestone at the cell's midpoint to ensure it lands in the correct cell
+    const visualDistance = (targetCell * KM_PER_CELL) + (KM_PER_CELL / 2);
 
     // Prepare milestone data with schema-compatible fields
     const milestoneData = {

@@ -154,7 +154,8 @@ export default {
       mood: 'Stimmung',
       status: 'Status',
       rarity: 'Seltenheit',
-      images: 'Fotos'
+      images: 'Fotos',
+      fullImage: 'Vollbild'
     }
   }
 };
