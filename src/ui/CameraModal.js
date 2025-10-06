@@ -182,7 +182,11 @@ export class CameraModal {
     const gpsIndicator = document.querySelector('.gps-indicator');
 
     try {
-      this.gpsPosition = await geolocationService.getCurrentPosition();
+      // Try to get GPS with 3-second race condition
+      this.gpsPosition = await Promise.race([
+        geolocationService.getCurrentPosition(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('GPS timeout')), 3000))
+      ]);
 
       if (gpsIndicator) {
         gpsIndicator.classList.remove('gps-acquiring');
@@ -191,12 +195,17 @@ export class CameraModal {
 
       console.log('✅ GPS position acquired:', this.gpsPosition);
     } catch (error) {
-      console.warn('⚠️ GPS acquisition failed:', error);
+      console.warn('⚠️ GPS acquisition failed, using fallback:', error.message);
+
+      // Use fallback position instead of failing
+      this.gpsPosition = geolocationService.getFallbackPosition();
 
       if (gpsIndicator) {
         gpsIndicator.classList.remove('gps-acquiring');
-        gpsIndicator.classList.add('gps-error');
+        gpsIndicator.classList.add('gps-fallback'); // New class for fallback state
       }
+
+      console.log('📍 Using fallback position:', this.gpsPosition.fallbackReason);
     } finally {
       this.gpsAcquiring = false;
     }

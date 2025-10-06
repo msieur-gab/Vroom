@@ -57,6 +57,11 @@
   animation: none;
 }
 
+.gps-indicator.gps-fallback {
+  background: #FFC107; /* Amber/yellow for fallback (approximate location) */
+  animation: none;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }

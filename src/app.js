@@ -725,6 +725,17 @@ class VrooomApp {
   }
 
   /**
+   * Promise timeout helper
+   * @param {number} ms - Timeout in milliseconds
+   * @returns {Promise} Promise that rejects after timeout
+   */
+  timeout(ms) {
+    return new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('GPS timeout')), ms)
+    );
+  }
+
+  /**
    * Show photo preview modal
    */
   showPhotoPreview(photoData, position, tripDistance) {

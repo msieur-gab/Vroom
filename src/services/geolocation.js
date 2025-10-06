@@ -115,7 +115,7 @@ export class GeolocationService {
         },
         {
           enableHighAccuracy: true,
-          timeout: 30000, // Increased timeout to 30 seconds
+          timeout: 5000, // 5 second timeout - fail fast for better UX
           maximumAge: 0, // Always get fresh position (important for testing with mocked locations)
           ...options
         }
@@ -274,6 +274,43 @@ export class GeolocationService {
     const latDir = lat >= 0 ? 'N' : 'S';
     const lonDir = lon >= 0 ? 'E' : 'W';
     return `${Math.abs(lat).toFixed(6)}°${latDir}, ${Math.abs(lon).toFixed(6)}°${lonDir}`;
+  }
+
+  /**
+   * Get fallback GPS position when real GPS fails
+   * Priority: last position → home position → zero coordinates
+   * @returns {Object} Fallback position object
+   */
+  getFallbackPosition() {
+    // Try last known position (probably still nearby)
+    if (this._lastPosition) {
+      console.log('📍 Using last known position as fallback');
+      return {
+        ...this._lastPosition,
+        isFallback: true,
+        fallbackReason: 'last_position'
+      };
+    }
+
+    // Try home position (conservative estimate)
+    if (this._homePosition) {
+      console.log('🏠 Using home position as fallback');
+      return {
+        ...this._homePosition,
+        isFallback: true,
+        fallbackReason: 'home_position'
+      };
+    }
+
+    // Last resort: zero coordinates (0km distance)
+    console.log('⚠️ Using zero coordinates as fallback');
+    return {
+      latitude: 0,
+      longitude: 0,
+      accuracy: 999,
+      isFallback: true,
+      fallbackReason: 'no_position'
+    };
   }
 
   /**
