@@ -21,6 +21,12 @@ export class CanvasJourneyGrid {
     this.CELL_PADDING = GridConfig.cellPadding;
     this.HORIZONTAL_PADDING = GridConfig.horizontalPadding;
 
+    // Debug configuration
+    this.DEBUG = {
+      showGrid: false,  // Toggle grid cell visibility (for development)
+      showWaypoints: false  // Toggle waypoint debug dots (set in drawWaypointDebug)
+    };
+
     // Calculate responsive cell size
     this.calculateCellSize();
     
@@ -113,7 +119,10 @@ export class CanvasJourneyGrid {
     this.container.innerHTML = '';
     this.container.appendChild(this.canvas);
     this.container.appendChild(this.nodeOverlay);
-    
+
+    // Initialize scenery renderer with overlay
+    this.sceneryRenderer.initialize(this.nodeOverlay);
+
     // Make container scrollable
     this.container.style.cssText = `
       overflow-y: auto;
@@ -243,8 +252,13 @@ export class CanvasJourneyGrid {
     const visibleTop = this.scrollY - 100; // Extra buffer
     const visibleBottom = this.scrollY + this.viewportHeight + 100;
 
-    // Draw grid cells (only visible ones)
-    this.drawVisibleGrid(visibleTop, visibleBottom);
+    // Draw biome backgrounds FIRST (behind everything)
+    this.drawBiomeBackgrounds(visibleTop, visibleBottom);
+
+    // Draw grid cells (only visible ones) - optional for debugging
+    if (this.DEBUG.showGrid) {
+      this.drawVisibleGrid(visibleTop, visibleBottom);
+    }
 
     // Don't draw canvas nodes - we use DOM overlay NodeComponents instead
     // this.drawVisibleNodes(visibleTop, visibleBottom);
@@ -254,14 +268,69 @@ export class CanvasJourneyGrid {
   }
   
   /**
+   * Draw biome background colors based on distance/height
+   * Creates immersive environmental zones that change as you scroll
+   */
+  drawBiomeBackgrounds(visibleTop, visibleBottom) {
+    // Get biome definitions from SceneryRenderer
+    const biomes = this.sceneryRenderer.biomes;
+
+    // Calculate which biomes are visible in viewport
+    for (let i = 0; i < biomes.length; i++) {
+      const biome = biomes[i];
+      const nextBiome = i < biomes.length - 1 ? biomes[i + 1] : null;
+
+      // Convert km to pixel height
+      const biomeStartY = (biome.minKm / this.KM_PER_ROW) * (this.CELL_SIZE + this.CELL_PADDING);
+      const biomeEndY = nextBiome
+        ? (nextBiome.minKm / this.KM_PER_ROW) * (this.CELL_SIZE + this.CELL_PADDING)
+        : this.canvas.height;
+
+      // Skip if biome not visible
+      if (biomeEndY < visibleTop || biomeStartY > visibleBottom) continue;
+
+      // Calculate visible portion of this biome
+      const drawStartY = Math.max(0, biomeStartY);
+      const drawEndY = Math.min(this.canvas.height, biomeEndY);
+      const drawHeight = drawEndY - drawStartY;
+
+      // Draw biome background with gradient if there's a next biome
+      if (nextBiome && drawEndY === biomeEndY) {
+        // Create gradient for smooth transition (last 20% of biome)
+        const transitionHeight = drawHeight * 0.2;
+        const solidHeight = drawHeight - transitionHeight;
+
+        // Solid color portion
+        this.ctx.fillStyle = biome.bgColor;
+        this.ctx.fillRect(0, drawStartY, this.canvas.width, solidHeight);
+
+        // Gradient transition
+        const gradient = this.ctx.createLinearGradient(
+          0, drawStartY + solidHeight,
+          0, drawStartY + drawHeight
+        );
+        gradient.addColorStop(0, biome.bgColor);
+        gradient.addColorStop(1, nextBiome.bgColor);
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, drawStartY + solidHeight, this.canvas.width, transitionHeight);
+      } else {
+        // No transition, just solid color
+        this.ctx.fillStyle = biome.bgColor;
+        this.ctx.fillRect(0, drawStartY, this.canvas.width, drawHeight);
+      }
+    }
+  }
+
+  /**
    * Draw visible grid cells
    */
   drawVisibleGrid(visibleTop, visibleBottom) {
     const firstVisibleRow = Math.max(0, Math.floor(visibleTop / (this.CELL_SIZE + this.CELL_PADDING)));
     const lastVisibleRow = Math.ceil(visibleBottom / (this.CELL_SIZE + this.CELL_PADDING));
 
-    this.ctx.fillStyle = '#e9ecef';
-    this.ctx.strokeStyle = '#dee2e6';
+    // Semi-transparent white cells to let biome colors show through
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
     this.ctx.lineWidth = 1;
 
     for (let row = firstVisibleRow; row <= lastVisibleRow; row++) {
@@ -310,14 +379,16 @@ export class CanvasJourneyGrid {
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
 
-    // Draw scenery BEFORE the road (so road appears on top)
-    this.sceneryRenderer.drawDecorations(this.ctx, visibleTop, visibleBottom);
+    // Scenery decorations are now DOM-based (rendered in nodeOverlay)
+    // No canvas drawing needed - decorations updated in rebuildPathCache()
 
     // Draw cached organic path
     this.drawOrganicPath(this.pathCache.organicPath);
 
-    // DEBUG: Draw red dots at waypoints
-    this.drawWaypointDebug(this.pathCache.waypoints);
+    // DEBUG: Draw red dots at waypoints (optional)
+    if (this.DEBUG.showWaypoints) {
+      this.drawWaypointDebug(this.pathCache.waypoints);
+    }
   }
 
   /**

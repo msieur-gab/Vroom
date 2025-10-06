@@ -1002,5 +1002,25 @@ class VrooomApp {
 
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  new VrooomApp();
+  const app = new VrooomApp();
+
+  // Expose debug controls to console
+  window.vroomDebug = {
+    showGrid: (show = true) => {
+      app.canvasGrid.DEBUG.showGrid = show;
+      app.canvasGrid.redraw();
+      console.log(`🔧 Grid visibility: ${show ? 'ON' : 'OFF'}`);
+    },
+    showWaypoints: (show = true) => {
+      app.canvasGrid.DEBUG.showWaypoints = show;
+      app.canvasGrid.redraw();
+      console.log(`🔧 Waypoint debug: ${show ? 'ON' : 'OFF'}`);
+    },
+    hideGrid: () => window.vroomDebug.showGrid(false),
+    hideWaypoints: () => window.vroomDebug.showWaypoints(false)
+  };
+
+  console.log('🔧 Debug controls available:');
+  console.log('  window.vroomDebug.showGrid() / hideGrid()');
+  console.log('  window.vroomDebug.showWaypoints() / hideWaypoints()');
 });
