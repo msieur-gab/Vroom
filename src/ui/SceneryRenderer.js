@@ -42,7 +42,7 @@ export class SceneryRenderer {
           { index: 0 },  // Tree 1 (pine-style)
           { index: 1 }   // Tree 2 (rounded style)
         ],
-        bgColor: '#7CB342'  // Rich forest green
+        bgColor: '#edf1beff'  // Rich forest green
       },
       {
         minKm: 2000,

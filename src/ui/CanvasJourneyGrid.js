@@ -65,6 +65,7 @@ export class CanvasJourneyGrid {
 
     // Cached pattern sources for contour fills
     this.contourFillPatternSources = new Map();
+    this.backgroundPatternSource = null;
 
     // DOM overlay for interactive nodes
     this.nodeOverlay = null;
@@ -287,7 +288,7 @@ export class CanvasJourneyGrid {
     dotCanvas.width = 24;
     dotCanvas.height = 24;
     const dotCtx = dotCanvas.getContext('2d');
-    dotCtx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+    dotCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
     dotCtx.beginPath();
     dotCtx.arc(6, 6, 1.5, 0, Math.PI * 2);
     dotCtx.fill();
@@ -896,6 +897,30 @@ export class CanvasJourneyGrid {
     return this.filterDuplicatePoints(pts);
   }
 
+  getBackgroundPattern() {
+    if (!this.backgroundPatternSource) {
+      const size = 24;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = 'rgba(60, 60, 60, 0.02)';
+      ctx.beginPath();
+      ctx.arc(size * 0.25, size * 0.3, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(60, 60, 60, 0.015)';
+      ctx.beginPath();
+      ctx.arc(size * 0.65, size * 0.7, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      this.backgroundPatternSource = canvas;
+    }
+
+    return this.backgroundPatternSource;
+  }
+
   getContourPatternSource(levelIndex) {
     if (!this.contourFillPatternSources) {
       this.contourFillPatternSources = new Map();
@@ -946,6 +971,13 @@ export class CanvasJourneyGrid {
     return (dx * dx + dy * dy) <= tolerance * tolerance;
   }
 
+  fillContourInterior(ctx, path, fillStyle) {
+    ctx.save();
+    ctx.fillStyle = fillStyle;
+    ctx.fill(path, 'nonzero');
+    ctx.restore();
+  }
+
   renderContourOverlay(ctx, path2d, contourData) {
     const strokeColors = [
       'rgba(149, 130, 103, 0.32)',
@@ -956,23 +988,35 @@ export class CanvasJourneyGrid {
       'rgba(67, 59, 50, 0.22)'
     ];
 
-    ctx.fillStyle = '#f1eee6';
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    contourData.groups.forEach(group => {
+    const backgroundPatternSource = this.getBackgroundPattern();
+    const backgroundPattern = backgroundPatternSource ? ctx.createPattern(backgroundPatternSource, 'repeat') : null;
+    if (backgroundPattern) {
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = backgroundPattern;
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      ctx.restore();
+    }
+
+    const fillColors = [
+      'rgba(149, 130, 103, 0.0)',
+      'rgba(130, 115, 93, 0.0)',
+      'rgba(109, 97, 78, 0.0)',
+      'rgba(93, 83, 68, 0.0)',
+      'rgba(80, 71, 60, 0.0)',
+      '#edf1beff'
+    ];
+
+    for (let index = contourData.groups.length - 1; index >= 0; index--) {
+      const group = contourData.groups[index];
       const strokeColor = strokeColors[group.colorIndex % strokeColors.length];
-      const patternSource = this.getContourPatternSource(group.colorIndex);
-      const fillPattern = patternSource ? ctx.createPattern(patternSource, 'repeat') : null;
+      const fillColor = fillColors[group.colorIndex % fillColors.length];
 
       group.paths.forEach(({ path, closed }) => {
         if (closed) {
-          if (fillPattern) {
-            ctx.fillStyle = fillPattern;
-            ctx.fill(path, 'nonzero');
-          } else {
-            ctx.fillStyle = 'rgba(80, 80, 80, 0.03)';
-            ctx.fill(path, 'nonzero');
-          }
+          this.fillContourInterior(ctx, path, fillColor);
         }
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.4;
@@ -980,7 +1024,7 @@ export class CanvasJourneyGrid {
         ctx.lineCap = 'round';
         ctx.stroke(path);
       });
-    });
+    }
 
     ctx.save();
     ctx.globalCompositeOperation = 'destination-out';
@@ -1087,19 +1131,19 @@ export class CanvasJourneyGrid {
 
     // Draw road layers for depth (doubled thickness)
     // Shadow layer
-    ctx.strokeStyle = '#333';
+    ctx.strokeStyle = '#aebe66ff';
     ctx.lineWidth = 16;
     ctx.globalAlpha = 0.3;
     ctx.stroke(path2d);
 
     // Main road surface
-    ctx.strokeStyle = '#666';
+    ctx.strokeStyle = '#aebe66ff';
     ctx.lineWidth = 12;
     ctx.globalAlpha = 1.0;
     ctx.stroke(path2d);
 
     // Center line (optional)
-    ctx.strokeStyle = '#888';
+    // ctx.strokeStyle = '#888';
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.5;
     ctx.stroke(path2d);
