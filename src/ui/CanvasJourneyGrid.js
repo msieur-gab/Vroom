@@ -44,6 +44,8 @@ export class CanvasJourneyGrid {
       sortedNodes: null,
       waypoints: null,
       organicPath: null,
+      organicPathVersion: 0,
+      contourOverlay: null,
       isDirty: true
     };
 
@@ -60,6 +62,9 @@ export class CanvasJourneyGrid {
 
     // Pattern textures for biome backgrounds (created lazily)
     this.biomePatterns = null;
+
+    // Cached pattern sources for contour fills
+    this.contourFillPatternSources = new Map();
 
     // DOM overlay for interactive nodes
     this.nodeOverlay = null;
@@ -478,6 +483,9 @@ export class CanvasJourneyGrid {
     // Scenery decorations are now DOM-based (rendered in nodeOverlay)
     // No canvas drawing needed - decorations updated in rebuildPathCache()
 
+    // Draw contour background before road stroke
+    this.drawElevationContours(this.pathCache.organicPath, this.pathCache.waypoints);
+
     // Draw cached organic path
     this.drawOrganicPath(this.pathCache.organicPath);
 
@@ -512,6 +520,8 @@ export class CanvasJourneyGrid {
 
     // Generate organic Path2D
     this.pathCache.organicPath = this.organicPathfinder.createOrganicSerpentinePath(this.pathCache.sortedNodes);
+    this.pathCache.organicPathVersion = Date.now();
+    this.pathCache.contourOverlay = null;
 
     // Generate scenery decorations (pass waypoints to detect traversed cells)
     this.sceneryRenderer.generateDecorations(this.pathCache.sortedNodes, this.pathCache.waypoints);
@@ -597,6 +607,462 @@ export class CanvasJourneyGrid {
     }
   }
   
+  /**
+   * Draw contour-style elevation lines derived directly from waypoint influence
+   */
+  drawElevationContours(path2d, waypoints) {
+    if (!path2d || !waypoints || waypoints.length < 2) return;
+    if (!this.canvas) return;
+
+    const overlay = this.ensureContourOverlay(path2d, waypoints);
+    if (!overlay) return;
+
+    this.ctx.drawImage(overlay, 0, 0);
+  }
+
+  ensureContourOverlay(path2d, waypoints) {
+    if (!this.canvas) return null;
+
+    if (!this.pathCache.contourOverlay) {
+      this.pathCache.contourOverlay = document.createElement('canvas');
+      this.pathCache.contourOverlay._pathVersion = null;
+    }
+
+    const overlay = this.pathCache.contourOverlay;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    const currentVersion = this.pathCache.organicPathVersion || Date.now();
+
+    if (overlay.width !== width || overlay.height !== height || overlay._pathVersion !== currentVersion) {
+      overlay.width = width;
+      overlay.height = height;
+      const overlayCtx = overlay.getContext('2d');
+      overlayCtx.clearRect(0, 0, width, height);
+
+      const influence = this.buildWaypointInfluenceField(waypoints, width, height);
+      const contours = this.generateMarchingSquaresContours(influence);
+      this.renderContourOverlay(overlayCtx, path2d, contours);
+
+      overlay._pathVersion = currentVersion;
+    }
+
+    return overlay;
+  }
+
+  buildWaypointInfluenceField(waypoints, width, height) {
+    const cellSize = Math.max(10, Math.floor(this.CELL_SIZE * 0.25));
+    const cols = Math.ceil(width / cellSize) + 6;
+    const rows = Math.ceil(height / cellSize) + 6;
+    const originX = -cellSize * 3;
+    const originY = -cellSize * 3;
+
+    const field = [];
+    for (let row = 0; row < rows; row++) {
+      const rowData = [];
+      const sampleY = originY + row * cellSize;
+      for (let col = 0; col < cols; col++) {
+        const sampleX = originX + col * cellSize;
+        rowData.push(this.sampleWaypointInfluence(sampleX, sampleY, waypoints));
+      }
+      field.push(rowData);
+    }
+
+    return {
+      data: field,
+      rows,
+      cols,
+      cellSize,
+      originX,
+      originY
+    };
+  }
+
+  sampleWaypointInfluence(x, y, waypoints) {
+    let value = 0;
+    const baseRadius = Math.max(this.CELL_SIZE * 0.45, 45);
+    const falloff = baseRadius * baseRadius;
+
+    for (let i = 0; i < waypoints.length; i++) {
+      const wp = waypoints[i];
+      const dx = x - wp.x;
+      const dy = y - wp.y;
+      const distSq = dx * dx + dy * dy;
+      value += Math.exp(-distSq / falloff);
+    }
+
+    return value;
+  }
+
+  generateMarchingSquaresContours(field) {
+    const thresholds = [0.7, 0.55, 0.4, 0.27, 0.18, 0.1];
+    const groups = [];
+
+    for (let thresholdIndex = 0; thresholdIndex < thresholds.length; thresholdIndex++) {
+      const threshold = thresholds[thresholdIndex];
+      const rawSegments = [];
+
+      for (let row = 0; row < field.rows - 1; row++) {
+        for (let col = 0; col < field.cols - 1; col++) {
+          const cell = this.extractCell(field, row, col);
+          const segs = this.marchSquare(cell, threshold);
+          if (!segs) continue;
+          for (const seg of segs) {
+            rawSegments.push({
+              ax: seg[0].x, ay: seg[0].y, bx: seg[1].x, by: seg[1].y
+            });
+          }
+        }
+      }
+
+      if (rawSegments.length === 0) {
+        continue;
+      }
+
+      const polylines = this.buildContourPolylines(rawSegments);
+      const paths = [];
+
+      for (const poly of polylines) {
+        const smoothed = this.smoothPolyline(poly.points, poly.closed, 2);
+        if (smoothed.length < 2) continue;
+
+        const path = new Path2D();
+        path.moveTo(smoothed[0].x, smoothed[0].y);
+        for (let i = 1; i < smoothed.length; i++) {
+          path.lineTo(smoothed[i].x, smoothed[i].y);
+        }
+        if (poly.closed) {
+          path.closePath();
+        }
+        paths.push({ path, closed: poly.closed });
+      }
+
+      if (paths.length > 0) {
+        groups.push({ colorIndex: thresholdIndex, paths });
+      }
+    }
+
+    return { groups };
+  }
+
+  buildContourPolylines(lines) {
+    if (lines.length === 0) return [];
+
+    const keyForPoint = (x, y) => `${x.toFixed(3)},${y.toFixed(3)}`;
+    const adjacency = new Map();
+    const used = new Array(lines.length).fill(false);
+
+    const addEntry = (pointKey, entry) => {
+      if (!adjacency.has(pointKey)) {
+        adjacency.set(pointKey, []);
+      }
+      adjacency.get(pointKey).push(entry);
+    };
+
+    lines.forEach((line, index) => {
+      addEntry(keyForPoint(line.ax, line.ay), { index, isStart: true });
+      addEntry(keyForPoint(line.bx, line.by), { index, isStart: false });
+    });
+
+    const polylines = [];
+
+    const extend = (poly, pointKey, direction) => {
+      while (true) {
+        const entries = adjacency.get(pointKey);
+        if (!entries) break;
+
+        let nextEntry = null;
+        for (const entry of entries) {
+          if (!used[entry.index]) {
+            nextEntry = entry;
+            break;
+          }
+        }
+
+        if (!nextEntry) break;
+
+        used[nextEntry.index] = true;
+        const line = lines[nextEntry.index];
+        let nextPoint;
+        let nextKey;
+
+        if (nextEntry.isStart) {
+          nextPoint = { x: line.bx, y: line.by };
+          nextKey = keyForPoint(line.bx, line.by);
+        } else {
+          nextPoint = { x: line.ax, y: line.ay };
+          nextKey = keyForPoint(line.ax, line.ay);
+        }
+
+        if (direction === 'forward') {
+          poly.push(nextPoint);
+        } else {
+          poly.unshift(nextPoint);
+        }
+
+        pointKey = nextKey;
+      }
+    };
+
+    const pickUnusedIndexWithLooseEnd = () => {
+      for (let i = 0; i < lines.length; i++) {
+        if (used[i]) continue;
+
+        const startKey = keyForPoint(lines[i].ax, lines[i].ay);
+        const endKey = keyForPoint(lines[i].bx, lines[i].by);
+        const startDegree = (adjacency.get(startKey)?.filter(entry => !used[entry.index]).length) || 0;
+        const endDegree = (adjacency.get(endKey)?.filter(entry => !used[entry.index]).length) || 0;
+
+        if (startDegree === 1 || endDegree === 1) {
+          return i;
+        }
+      }
+      return -1;
+    };
+
+    while (true) {
+      let segmentIndex = pickUnusedIndexWithLooseEnd();
+      if (segmentIndex === -1) {
+        segmentIndex = used.findIndex(flag => !flag);
+        if (segmentIndex === -1) {
+          break;
+        }
+      }
+
+      if (used[segmentIndex]) continue;
+
+      used[segmentIndex] = true;
+      const line = lines[segmentIndex];
+      const polyline = [
+        { x: line.ax, y: line.ay },
+        { x: line.bx, y: line.by }
+      ];
+
+      extend(polyline, keyForPoint(line.bx, line.by), 'forward');
+      extend(polyline, keyForPoint(line.ax, line.ay), 'backward');
+
+      const cleaned = this.filterDuplicatePoints(polyline);
+      let closed = false;
+      if (cleaned.length > 2 && this.pointsAreClose(cleaned[0], cleaned[cleaned.length - 1], 0.5)) {
+        cleaned.pop();
+        closed = true;
+      }
+
+      polylines.push({ points: cleaned, closed });
+    }
+
+    return polylines;
+  }
+
+  smoothPolyline(points, closed, iterations = 2) {
+    let pts = points.slice();
+
+    for (let iter = 0; iter < iterations; iter++) {
+      if (closed) {
+        if (pts.length < 3) break;
+        const newPts = [];
+        for (let i = 0; i < pts.length; i++) {
+          const p0 = pts[i];
+          const p1 = pts[(i + 1) % pts.length];
+          newPts.push({
+            x: 0.75 * p0.x + 0.25 * p1.x,
+            y: 0.75 * p0.y + 0.25 * p1.y
+          });
+          newPts.push({
+            x: 0.25 * p0.x + 0.75 * p1.x,
+            y: 0.25 * p0.y + 0.75 * p1.y
+          });
+        }
+        pts = newPts;
+      } else {
+        if (pts.length < 3) break;
+        const newPts = [pts[0]];
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p0 = pts[i];
+          const p1 = pts[i + 1];
+          newPts.push({
+            x: 0.75 * p0.x + 0.25 * p1.x,
+            y: 0.75 * p0.y + 0.25 * p1.y
+          });
+          newPts.push({
+            x: 0.25 * p0.x + 0.75 * p1.x,
+            y: 0.25 * p0.y + 0.75 * p1.y
+          });
+        }
+        newPts.push(pts[pts.length - 1]);
+        pts = newPts;
+      }
+    }
+
+    return this.filterDuplicatePoints(pts);
+  }
+
+  getContourPatternSource(levelIndex) {
+    if (!this.contourFillPatternSources) {
+      this.contourFillPatternSources = new Map();
+    }
+
+    if (!this.contourFillPatternSources.has(levelIndex)) {
+      const size = 18;
+      const dotCanvas = document.createElement('canvas');
+      dotCanvas.width = size;
+      dotCanvas.height = size;
+      const dotCtx = dotCanvas.getContext('2d');
+
+      const baseAlpha = 0.055;
+      const alpha = baseAlpha - levelIndex * 0.006;
+      const clampedAlpha = Math.max(0.015, alpha);
+      const radius = 1.3 + levelIndex * 0.25;
+      const secondaryRadius = Math.max(0.6, radius * 0.65);
+      const offset = (levelIndex % 3) * 3;
+
+      dotCtx.fillStyle = 'rgba(60, 60, 60, ' + clampedAlpha.toFixed(3) + ')';
+      dotCtx.beginPath();
+      dotCtx.arc(size * 0.3 + offset, size * 0.35, radius, 0, Math.PI * 2);
+      dotCtx.fill();
+      dotCtx.beginPath();
+      dotCtx.arc(size * 0.75, size * 0.7 + offset * 0.2, secondaryRadius, 0, Math.PI * 2);
+      dotCtx.fill();
+
+      this.contourFillPatternSources.set(levelIndex, dotCanvas);
+    }
+
+    return this.contourFillPatternSources.get(levelIndex);
+  }
+
+  filterDuplicatePoints(points) {
+    if (points.length === 0) return [];
+    const result = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+      if (!this.pointsAreClose(points[i], result[result.length - 1], 0.5)) {
+        result.push(points[i]);
+      }
+    }
+    return result;
+  }
+
+  pointsAreClose(a, b, tolerance = 0.5) {
+    const dx = a.x - b.x;
+    const dy = a.y - b.y;
+    return (dx * dx + dy * dy) <= tolerance * tolerance;
+  }
+
+  renderContourOverlay(ctx, path2d, contourData) {
+    const strokeColors = [
+      'rgba(149, 130, 103, 0.32)',
+      'rgba(130, 115, 93, 0.3)',
+      'rgba(109, 97, 78, 0.28)',
+      'rgba(93, 83, 68, 0.26)',
+      'rgba(80, 71, 60, 0.24)',
+      'rgba(67, 59, 50, 0.22)'
+    ];
+
+    ctx.fillStyle = '#f1eee6';
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+    contourData.groups.forEach(group => {
+      const strokeColor = strokeColors[group.colorIndex % strokeColors.length];
+      const patternSource = this.getContourPatternSource(group.colorIndex);
+      const fillPattern = patternSource ? ctx.createPattern(patternSource, 'repeat') : null;
+
+      group.paths.forEach(({ path, closed }) => {
+        if (closed) {
+          if (fillPattern) {
+            ctx.fillStyle = fillPattern;
+            ctx.fill(path, 'nonzero');
+          } else {
+            ctx.fillStyle = 'rgba(80, 80, 80, 0.03)';
+            ctx.fill(path, 'nonzero');
+          }
+        }
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.4;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.stroke(path);
+      });
+    });
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = 14;
+    ctx.strokeStyle = '#000';
+    ctx.stroke(path2d);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = 'rgba(154, 136, 110, 0.1)';
+    ctx.lineWidth = 20;
+    ctx.stroke(path2d);
+    ctx.restore();
+  }
+
+  extractCell(field, row, col) {
+    const x = field.originX + col * field.cellSize;
+    const y = field.originY + row * field.cellSize;
+    return {
+      x,
+      y,
+      size: field.cellSize,
+      tl: field.data[row][col],
+      tr: field.data[row][col + 1],
+      br: field.data[row + 1][col + 1],
+      bl: field.data[row + 1][col]
+    };
+  }
+
+  marchSquare(cell, threshold) {
+    const { x, y, size, tl, tr, br, bl } = cell;
+    const caseIndex = (tl > threshold ? 8 : 0) | (tr > threshold ? 4 : 0) | (br > threshold ? 2 : 0) | (bl > threshold ? 1 : 0);
+
+    if (caseIndex === 0 || caseIndex === 15) return null;
+
+    const edges = [
+      [[{ x, y }, tl], [{ x: x + size, y }, tr]],
+      [[{ x: x + size, y }, tr], [{ x: x + size, y: y + size }, br]],
+      [[{ x: x + size, y: y + size }, br], [{ x, y: y + size }, bl]],
+      [[{ x, y: y + size }, bl], [{ x, y }, tl]]
+    ];
+
+    const lookup = {
+      1: [3, 2], 2: [1, 2], 3: [3, 1], 4: [0, 1], 5: [0, 3, 1, 2], 6: [0, 2], 7: [3, 0],
+      8: [0, 3], 9: [0, 2], 10: [0, 1, 2, 3], 11: [0, 1], 12: [3, 1], 13: [1, 2], 14: [3, 2]
+    };
+
+    const edgeIndices = lookup[caseIndex];
+    if (!edgeIndices) return null;
+
+    const points = [];
+    for (let i = 0; i < edgeIndices.length; i++) {
+      const edge = edges[edgeIndices[i]];
+      points.push(this.interpolateEdge(edge[0], edge[1], threshold));
+    }
+
+    const segments = [];
+    for (let i = 0; i < points.length; i += 2) {
+      if (points[i] && points[i + 1]) {
+        segments.push([points[i], points[i + 1]]);
+      }
+    }
+
+    return segments.length ? segments : null;
+  }
+
+  interpolateEdge(start, end, threshold) {
+    const [p0, v0] = start;
+    const [p1, v1] = end;
+    const denom = v0 - v1;
+    if (denom === 0) {
+      return { x: p0.x, y: p0.y };
+    }
+
+    const t = (v0 - threshold) / denom;
+    return {
+      x: p0.x + (p1.x - p0.x) * t,
+      y: p0.y + (p1.y - p0.y) * t
+    };
+  }
+
   /**
    * Convert node to bounds format for pathfinder
    */
