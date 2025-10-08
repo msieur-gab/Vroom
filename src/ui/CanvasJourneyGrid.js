@@ -1,7 +1,7 @@
 import { OrganicPathfinder } from './OrganicPathfinder.js';
 import { NodeComponent } from './NodeComponent.js';
 import { SceneryRenderer } from './SceneryRenderer.js';
-import { GridConfig } from '../config.js';
+import { GridConfig, ContourConfig } from '../config.js';
 
 /**
  * CanvasJourneyGrid - High-performance Canvas-based journey visualization
@@ -66,6 +66,7 @@ export class CanvasJourneyGrid {
     // Cached pattern sources for contour fills
     this.contourFillPatternSources = new Map();
     this.backgroundPatternSource = null;
+    this.innermostContourPattern = null;
 
     // DOM overlay for interactive nodes
     this.nodeOverlay = null;
@@ -485,7 +486,7 @@ export class CanvasJourneyGrid {
     // No canvas drawing needed - decorations updated in rebuildPathCache()
 
     // Draw contour background before road stroke
-    this.drawElevationContours(this.pathCache.organicPath, this.pathCache.waypoints);
+    this.drawElevationContours(this.pathCache.organicPath, this.pathCache.sortedNodes);
 
     // Draw cached organic path
     this.drawOrganicPath(this.pathCache.organicPath);
@@ -611,17 +612,17 @@ export class CanvasJourneyGrid {
   /**
    * Draw contour-style elevation lines derived directly from waypoint influence
    */
-  drawElevationContours(path2d, waypoints) {
-    if (!path2d || !waypoints || waypoints.length < 2) return;
+  drawElevationContours(path2d, nodes) {
+    if (!path2d || !nodes || nodes.length === 0) return;
     if (!this.canvas) return;
 
-    const overlay = this.ensureContourOverlay(path2d, waypoints);
+    const overlay = this.ensureContourOverlay(path2d, nodes);
     if (!overlay) return;
 
     this.ctx.drawImage(overlay, 0, 0);
   }
 
-  ensureContourOverlay(path2d, waypoints) {
+  ensureContourOverlay(path2d, nodes) {
     if (!this.canvas) return null;
 
     if (!this.pathCache.contourOverlay) {
@@ -640,7 +641,7 @@ export class CanvasJourneyGrid {
       const overlayCtx = overlay.getContext('2d');
       overlayCtx.clearRect(0, 0, width, height);
 
-      const influence = this.buildWaypointInfluenceField(waypoints, width, height);
+      const influence = this.buildWaypointInfluenceField(nodes, width, height);
       const contours = this.generateMarchingSquaresContours(influence);
       this.renderContourOverlay(overlayCtx, path2d, contours);
 
@@ -650,12 +651,14 @@ export class CanvasJourneyGrid {
     return overlay;
   }
 
-  buildWaypointInfluenceField(waypoints, width, height) {
-    const cellSize = Math.max(10, Math.floor(this.CELL_SIZE * 0.25));
+  buildWaypointInfluenceField(nodes, width, height) {
+    const cellSize = Math.max(8, Math.floor(this.CELL_SIZE * 0.15));
     const cols = Math.ceil(width / cellSize) + 6;
     const rows = Math.ceil(height / cellSize) + 6;
     const originX = -cellSize * 3;
     const originY = -cellSize * 3;
+
+    const nodeCenters = nodes.map(node => this.getNodeCenter(node));
 
     const field = [];
     for (let row = 0; row < rows; row++) {
@@ -663,7 +666,7 @@ export class CanvasJourneyGrid {
       const sampleY = originY + row * cellSize;
       for (let col = 0; col < cols; col++) {
         const sampleX = originX + col * cellSize;
-        rowData.push(this.sampleWaypointInfluence(sampleX, sampleY, waypoints));
+        rowData.push(this.sampleWaypointInfluence(sampleX, sampleY, nodeCenters));
       }
       field.push(rowData);
     }
@@ -678,24 +681,84 @@ export class CanvasJourneyGrid {
     };
   }
 
-  sampleWaypointInfluence(x, y, waypoints) {
-    let value = 0;
-    const baseRadius = Math.max(this.CELL_SIZE * 0.45, 45);
-    const falloff = baseRadius * baseRadius;
+  // sampleWaypointInfluence(x, y, waypoints) {
+  //   let value = 0;
+  //   const baseRadius = Math.max(this.CELL_SIZE * 0.45, 45);
+  //   const falloff = baseRadius * baseRadius;
 
-    for (let i = 0; i < waypoints.length; i++) {
-      const wp = waypoints[i];
-      const dx = x - wp.x;
-      const dy = y - wp.y;
-      const distSq = dx * dx + dy * dy;
-      value += Math.exp(-distSq / falloff);
+  //   for (let i = 0; i < waypoints.length; i++) {
+  //     const wp = waypoints[i];
+  //     const dx = x - wp.x;
+  //     const dy = y - wp.y;
+  //     const distSq = dx * dx + dy * dy;
+  //     value += Math.exp(-distSq / falloff);
+  //   }
+
+  //   return value;
+  // }
+
+   // 1. Manhattan distance → diamond / parallelogram lobes
+
+  // sampleWaypointInfluence(x, y, waypoints) {
+  //   let value = 0;
+  //   const baseRadius = Math.max(this.CELL_SIZE * 0.45, 45);
+  //   const falloff = baseRadius * baseRadius;
+
+  //   for (let i = 0; i < waypoints.length; i++) {
+  //     const wp = waypoints[i];
+  //     const dx = Math.abs(x - wp.x);
+  //     const dy = Math.abs(y - wp.y);
+  //     const manhattan = dx + dy;
+  //     value += Math.exp(-(manhattan * manhattan) / falloff);
+  //   }
+
+  //   return value;
+  // }
+
+  // 2. Chebyshev distance → square / blocky lobes
+
+  sampleWaypointInfluence(x, y, influencePoints) {
+    let value = 0;
+    const baseRadius = Math.max(this.CELL_SIZE * 0.6, 60);
+
+    for (let i = 0; i < influencePoints.length; i++) {
+      const ip = influencePoints[i];
+      const dx = Math.abs(x - ip.x);
+      const dy = Math.abs(y - ip.y);
+      const chebyshev = Math.max(dx, dy);
+      const influence = Math.max(0, 1 - chebyshev / baseRadius);
+      value += influence;
     }
 
     return value;
   }
 
-  generateMarchingSquaresContours(field) {
-    const thresholds = [0.7, 0.55, 0.4, 0.27, 0.18, 0.1];
+  // 3. rotated diamonds
+  
+  // sampleWaypointInfluence(x, y, waypoints) {
+  //   let value = 0;
+  //   const baseRadius = Math.max(this.CELL_SIZE * 0.45, 45);
+  //   const falloff = baseRadius * baseRadius;
+  //   const invSqrt2 = Math.SQRT1_2; // 1 / √2
+
+  //   for (let i = 0; i < waypoints.length; i++) {
+  //     const wp = waypoints[i];
+  //     const dx = x - wp.x;
+  //     const dy = y - wp.y;
+
+  //     // Rotate by 45°: x' = (dx - dy)/√2, y' = (dx + dy)/√2
+  //     const rx = (dx - dy) * invSqrt2;
+  //     const ry = (dx + dy) * invSqrt2;
+
+  //     const rotatedManhattan = Math.abs(rx) + Math.abs(ry);
+  //     value += Math.exp(-(rotatedManhattan * rotatedManhattan) / falloff);
+  //   }
+
+  //   return value;
+  // }
+
+  generateMarchingSquaresContours(field, customThresholds = null) {
+    const thresholds = customThresholds || ContourConfig.thresholds;
     const groups = [];
 
     for (let thresholdIndex = 0; thresholdIndex < thresholds.length; thresholdIndex++) {
@@ -723,7 +786,7 @@ export class CanvasJourneyGrid {
       const paths = [];
 
       for (const poly of polylines) {
-        const smoothed = this.smoothPolyline(poly.points, poly.closed, 2);
+        const smoothed = this.smoothPolyline(poly.points, poly.closed, ContourConfig.smoothingIterations);
         if (smoothed.length < 2) continue;
 
         const path = new Path2D();
@@ -734,7 +797,7 @@ export class CanvasJourneyGrid {
         if (poly.closed) {
           path.closePath();
         }
-        paths.push({ path, closed: poly.closed });
+        paths.push({ path, closed: poly.closed, points: smoothed });
       }
 
       if (paths.length > 0) {
@@ -954,6 +1017,30 @@ export class CanvasJourneyGrid {
     return this.contourFillPatternSources.get(levelIndex);
   }
 
+  getInnermostContourPattern() {
+    if (!this.innermostContourPattern) {
+      const size = 8;
+      const patternCanvas = document.createElement('canvas');
+      patternCanvas.width = size;
+      patternCanvas.height = size;
+      const patternCtx = patternCanvas.getContext('2d');
+
+      patternCtx.strokeStyle = 'rgba(109, 97, 78, 0.28)'; // From ContourConfig.strokeColors[2]
+      patternCtx.lineWidth = 1;
+      patternCtx.beginPath();
+      patternCtx.moveTo(0, size);
+      patternCtx.lineTo(size, 0);
+      patternCtx.stroke();
+      
+      this.innermostContourPattern = this.ctx.createPattern(patternCanvas, 'repeat');
+    }
+    return this.innermostContourPattern;
+  }
+
+
+
+
+
   filterDuplicatePoints(points) {
     if (points.length === 0) return [];
     const result = [points[0]];
@@ -971,6 +1058,19 @@ export class CanvasJourneyGrid {
     return (dx * dx + dy * dy) <= tolerance * tolerance;
   }
 
+  computePolygonArea(points) {
+    if (!points || points.length < 3) return 0;
+
+    let area = 0;
+    for (let i = 0; i < points.length; i++) {
+      const p0 = points[i];
+      const p1 = points[(i + 1) % points.length];
+      area += (p0.x * p1.y) - (p1.x * p0.y);
+    }
+
+    return area * 0.5;
+  }
+
   fillContourInterior(ctx, path, fillStyle) {
     ctx.save();
     ctx.fillStyle = fillStyle;
@@ -979,14 +1079,8 @@ export class CanvasJourneyGrid {
   }
 
   renderContourOverlay(ctx, path2d, contourData) {
-    const strokeColors = [
-      'rgba(149, 130, 103, 0.32)',
-      'rgba(130, 115, 93, 0.3)',
-      'rgba(109, 97, 78, 0.28)',
-      'rgba(93, 83, 68, 0.26)',
-      'rgba(80, 71, 60, 0.24)',
-      'rgba(67, 59, 50, 0.22)'
-    ];
+    const strokeColors = ContourConfig.strokeColors;
+    const fillColors = ContourConfig.fillColors;
 
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -1000,24 +1094,66 @@ export class CanvasJourneyGrid {
       ctx.restore();
     }
 
-    const fillColors = [
-      'rgba(149, 130, 103, 0.0)',
-      'rgba(130, 115, 93, 0.0)',
-      'rgba(109, 97, 78, 0.0)',
-      'rgba(93, 83, 68, 0.0)',
-      'rgba(80, 71, 60, 0.0)',
-      '#edf1beff'
-    ];
+    const nodeCenters = this.pathCache.sortedNodes.map(node => this.getNodeCenter(node));
+    const outermostGroupIndex = contourData.groups.length > 0 ? contourData.groups[contourData.groups.length - 1].colorIndex : -1;
+    const hatchPattern = this.getInnermostContourPattern();
 
     for (let index = contourData.groups.length - 1; index >= 0; index--) {
       const group = contourData.groups[index];
       const strokeColor = strokeColors[group.colorIndex % strokeColors.length];
-      const fillColor = fillColors[group.colorIndex % fillColors.length];
+      
+      const closedPaths = [];
+      group.paths.forEach(entry => {
+        if (entry.closed && entry.points && entry.points.length >= 3) {
+          entry._polygonArea = this.computePolygonArea(entry.points);
+          closedPaths.push(entry);
+        }
+      });
 
-      group.paths.forEach(({ path, closed }) => {
+      let primaryPathId = null;
+      let largestArea = 0;
+      for (let i = 0; i < closedPaths.length; i++) {
+        const info = closedPaths[i];
+        const absArea = Math.abs(info._polygonArea);
+        if (absArea > largestArea) {
+          largestArea = absArea;
+          primaryPathId = closedPaths[i];
+        }
+      }
+
+      group.paths.forEach(entry => {
+        const { path, closed, points } = entry;
         if (closed) {
+          let fillColor = fillColors[group.colorIndex % fillColors.length];
+          const isOutermostPath = group.colorIndex === outermostGroupIndex;
+
+          if (isOutermostPath && hatchPattern) {
+            const isPrimary = primaryPathId && entry === primaryPathId;
+
+            if (!isPrimary) {
+              const nodesInside = nodeCenters.filter(center => ctx.isPointInPath(path, center.x, center.y)).length;
+
+              if (nodesInside === 0) {
+                console.log(
+                  `🟢 Hatch contour group ${index} | area=${entry._polygonArea?.toFixed(1) || 'n/a'} ` +
+                  `primaryArea=${primaryPathId?._polygonArea?.toFixed(1) || 'n/a'}`
+                );
+                fillColor = hatchPattern;
+              } else {
+                console.log(
+                  `⚪️ Skip contour group ${index} (contains ${nodesInside} nodes) | area=${entry._polygonArea?.toFixed(1) || 'n/a'}`
+                );
+              }
+            } else {
+              console.log(
+                `⚪️ Skip contour group ${index} (primary) | area=${entry._polygonArea?.toFixed(1) || 'n/a'}`
+              );
+            }
+          }
+
           this.fillContourInterior(ctx, path, fillColor);
         }
+
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = 1.4;
         ctx.lineJoin = 'round';

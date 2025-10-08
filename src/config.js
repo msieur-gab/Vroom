@@ -56,3 +56,36 @@ export const GeoConfig = {
   maximumAgeMs: 0,          // Force fresh GPS reading (no cache)
   earthRadiusKm: 6371       // Earth radius for Haversine calculations
 };
+
+/**
+ * Contour Line Configuration
+ * Settings for generating and styling elevation-style contour lines
+ */
+export const ContourConfig = {
+  // Thresholds for generating contour bands. Values are influence levels.
+  // Linearly spaced values create evenly spaced contour lines.
+  thresholds: [0.8, 0.65, 0.5, 0.35, 0.2, 0.05],
+
+  // Number of smoothing iterations to apply. Higher numbers = rounder corners.
+  smoothingIterations: 4,
+
+  // Stroke colors for the contour lines, from innermost to outermost.
+  strokeColors: [
+    'rgba(149, 130, 103, 0.32)',
+    'rgba(130, 115, 93, 0.3)',
+    'rgba(109, 97, 78, 0.28)',
+    'rgba(93, 83, 68, 0.26)',
+    'rgba(80, 71, 60, 0.24)',
+    'rgba(67, 59, 50, 0.22)'
+  ],
+
+  // Fill colors for the contour bands, from innermost to outermost.
+  fillColors: [
+    'rgba(149, 130, 103, 0.0)',
+    'rgba(130, 115, 93, 0.0)',
+    'rgba(109, 97, 78, 0.0)',
+    'rgba(93, 83, 68, 0.0)',
+    'rgba(80, 71, 60, 0.0)',
+    '#edf1beff'
+  ]
+};
