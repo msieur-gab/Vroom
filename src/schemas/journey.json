@@ -1,8 +1,8 @@
 {
   "display": {
-    "icon": "📷",
-    "color": "#4CAF50",
-    "size": "40px"
+    "icon": "+",
+    "color": "#B3D0C0",
+    "size": "36px"
   },
   "content": [
     { "field": "title", "type": "header" },

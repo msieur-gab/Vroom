@@ -42,7 +42,7 @@ export class SceneryRenderer {
           { index: 0 },  // Tree 1 (pine-style)
           { index: 1 }   // Tree 2 (rounded style)
         ],
-        bgColor: '#edf1beff'  // Rich forest green
+        bgColor: '#F4FFF9'  // Rich forest green
       },
       {
         minKm: 2000,
@@ -91,7 +91,7 @@ export class SceneryRenderer {
     this.config = {
       density: 0.8, // Probability of placing decoration in empty cell (0-1) - increased for fuller coverage
       baseSize: 32, // Base size for sprite rendering (will scale) - increased from 32 to 56
-      randomSizeVariation: 0.4, // ±40% size variation for more variety
+      randomSizeVariation: 0.6, // ±40% size variation for more variety
       minZIndex: 1,  // Decorations behind road
       maxZIndex: 15  // Decorations in front of road (road is z-index 10)
     };

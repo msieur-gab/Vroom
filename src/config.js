@@ -86,6 +86,6 @@ export const ContourConfig = {
     'rgba(109, 97, 78, 0.0)',
     'rgba(93, 83, 68, 0.0)',
     'rgba(80, 71, 60, 0.0)',
-    '#edf1beff'
+    '#F4FFF9'
   ]
 };

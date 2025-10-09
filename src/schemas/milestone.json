@@ -1,8 +1,8 @@
 {
   "display": {
     "icon": "🏁",
-    "color": "#FF9800",
-    "size": "45px"
+    "color": "#FFC3A7",
+    "size": "36px"
   },
   "content": [
     { "field": "achievement", "type": "header" },

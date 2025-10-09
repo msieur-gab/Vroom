@@ -1267,13 +1267,13 @@ export class CanvasJourneyGrid {
 
     // Draw road layers for depth (doubled thickness)
     // Shadow layer
-    ctx.strokeStyle = '#aebe66ff';
+    ctx.strokeStyle = '#B3D0C0';
     ctx.lineWidth = 16;
     ctx.globalAlpha = 0.3;
     ctx.stroke(path2d);
 
     // Main road surface
-    ctx.strokeStyle = '#aebe66ff';
+    ctx.strokeStyle = '#B3D0C0';
     ctx.lineWidth = 12;
     ctx.globalAlpha = 1.0;
     ctx.stroke(path2d);
