@@ -5,7 +5,7 @@
 
 export const GridConfig = {
   // Distance per cell in kilometers
-  kmPerCell: 10,
+  kmPerCell: 1,
 
   // Number of cells per row (affects serpentine width)
   cellsPerRow: 4,
