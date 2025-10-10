@@ -2,6 +2,7 @@ import { OrganicPathfinder } from './OrganicPathfinder.js';
 import { NodeComponent } from './NodeComponent.js';
 import { SceneryRenderer } from './SceneryRenderer.js';
 import { GridConfig, ContourConfig } from '../config.js';
+import { PatternFactory } from '../utils/PatternFactory.js';
 
 /**
  * CanvasJourneyGrid - High-performance Canvas-based journey visualization
@@ -60,10 +61,8 @@ export class CanvasJourneyGrid {
     // Scenery renderer for decorative elements
     this.sceneryRenderer = new SceneryRenderer(this);
 
-    // Pattern textures for biome backgrounds (created lazily)
+    // Pattern caches (created lazily)
     this.biomePatterns = null;
-
-    // Cached pattern sources for contour fills
     this.contourFillPatternSources = new Map();
     this.backgroundPatternSource = null;
     this.innermostContourPattern = null;
@@ -282,70 +281,7 @@ export class CanvasJourneyGrid {
    * Generates small repeating patterns (dots, crosses, etc.)
    */
   createBiomePatterns() {
-    const patterns = {};
-
-    // Dot pattern (for forest/plains)
-    const dotCanvas = document.createElement('canvas');
-    dotCanvas.width = 24;
-    dotCanvas.height = 24;
-    const dotCtx = dotCanvas.getContext('2d');
-    dotCtx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    dotCtx.beginPath();
-    dotCtx.arc(6, 6, 1.5, 0, Math.PI * 2);
-    dotCtx.fill();
-    dotCtx.beginPath();
-    dotCtx.arc(18, 18, 1.5, 0, Math.PI * 2);
-    dotCtx.fill();
-    patterns.dots = this.ctx.createPattern(dotCanvas, 'repeat');
-
-    // Cross pattern (for desert) - small + shapes
-    const crossCanvas = document.createElement('canvas');
-    crossCanvas.width = 25;
-    crossCanvas.height = 25;
-    const crossCtx = crossCanvas.getContext('2d');
-    crossCtx.strokeStyle = 'rgba(0, 0, 0, 0.10)';
-    crossCtx.lineWidth = 1.5;
-    crossCtx.lineCap = 'square';  // Square ends for sharp + shape
-    // Draw small cross (+) shape
-    crossCtx.beginPath();
-    // Vertical line (6px tall)
-    crossCtx.moveTo(12.5, 9.5);
-    crossCtx.lineTo(12.5, 15.5);
-    // Horizontal line (6px wide)
-    crossCtx.moveTo(9.5, 12.5);
-    crossCtx.lineTo(15.5, 12.5);
-    crossCtx.stroke();
-    patterns.crosses = this.ctx.createPattern(crossCanvas, 'repeat');
-
-    // Diagonal lines (for mountains)
-    const diagonalCanvas = document.createElement('canvas');
-    diagonalCanvas.width = 16;
-    diagonalCanvas.height = 16;
-    const diagCtx = diagonalCanvas.getContext('2d');
-    diagCtx.strokeStyle = 'rgba(0, 0, 0, 0.05)';
-    diagCtx.lineWidth = 1;
-    diagCtx.beginPath();
-    diagCtx.moveTo(0, 16);
-    diagCtx.lineTo(16, 0);
-    diagCtx.stroke();
-    patterns.diagonal = this.ctx.createPattern(diagonalCanvas, 'repeat');
-
-    // Small circles (for snow)
-    const circleCanvas = document.createElement('canvas');
-    circleCanvas.width = 30;
-    circleCanvas.height = 30;
-    const circleCtx = circleCanvas.getContext('2d');
-    circleCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    circleCtx.lineWidth = 1;
-    circleCtx.beginPath();
-    circleCtx.arc(8, 8, 3, 0, Math.PI * 2);
-    circleCtx.stroke();
-    circleCtx.beginPath();
-    circleCtx.arc(22, 22, 2, 0, Math.PI * 2);
-    circleCtx.stroke();
-    patterns.circles = this.ctx.createPattern(circleCanvas, 'repeat');
-
-    return patterns;
+    return PatternFactory.createBiomePatterns(this.ctx);
   }
 
   /**
@@ -908,25 +844,8 @@ export class CanvasJourneyGrid {
 
   getBackgroundPattern() {
     if (!this.backgroundPatternSource) {
-      const size = 24;
-      const canvas = document.createElement('canvas');
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext('2d');
-
-      ctx.fillStyle = 'rgba(60, 60, 60, 0.02)';
-      ctx.beginPath();
-      ctx.arc(size * 0.25, size * 0.3, 1.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = 'rgba(60, 60, 60, 0.015)';
-      ctx.beginPath();
-      ctx.arc(size * 0.65, size * 0.7, 1.1, 0, Math.PI * 2);
-      ctx.fill();
-
-      this.backgroundPatternSource = canvas;
+      this.backgroundPatternSource = PatternFactory.createBackgroundPattern(this.ctx);
     }
-
     return this.backgroundPatternSource;
   }
 
@@ -936,28 +855,8 @@ export class CanvasJourneyGrid {
     }
 
     if (!this.contourFillPatternSources.has(levelIndex)) {
-      const size = 18;
-      const dotCanvas = document.createElement('canvas');
-      dotCanvas.width = size;
-      dotCanvas.height = size;
-      const dotCtx = dotCanvas.getContext('2d');
-
-      const baseAlpha = 0.055;
-      const alpha = baseAlpha - levelIndex * 0.006;
-      const clampedAlpha = Math.max(0.015, alpha);
-      const radius = 1.3 + levelIndex * 0.25;
-      const secondaryRadius = Math.max(0.6, radius * 0.65);
-      const offset = (levelIndex % 3) * 3;
-
-      dotCtx.fillStyle = 'rgba(60, 60, 60, ' + clampedAlpha.toFixed(3) + ')';
-      dotCtx.beginPath();
-      dotCtx.arc(size * 0.3 + offset, size * 0.35, radius, 0, Math.PI * 2);
-      dotCtx.fill();
-      dotCtx.beginPath();
-      dotCtx.arc(size * 0.75, size * 0.7 + offset * 0.2, secondaryRadius, 0, Math.PI * 2);
-      dotCtx.fill();
-
-      this.contourFillPatternSources.set(levelIndex, dotCanvas);
+      const pattern = PatternFactory.createContourFillPattern(this.ctx, levelIndex);
+      this.contourFillPatternSources.set(levelIndex, pattern);
     }
 
     return this.contourFillPatternSources.get(levelIndex);
@@ -965,20 +864,10 @@ export class CanvasJourneyGrid {
 
   getInnermostContourPattern() {
     if (!this.innermostContourPattern) {
-      const size = 8;
-      const patternCanvas = document.createElement('canvas');
-      patternCanvas.width = size;
-      patternCanvas.height = size;
-      const patternCtx = patternCanvas.getContext('2d');
-
-      patternCtx.strokeStyle = 'rgba(109, 97, 78, 0.28)'; // From ContourConfig.strokeColors[2]
-      patternCtx.lineWidth = 1;
-      patternCtx.beginPath();
-      patternCtx.moveTo(0, size);
-      patternCtx.lineTo(size, 0);
-      patternCtx.stroke();
-      
-      this.innermostContourPattern = this.ctx.createPattern(patternCanvas, 'repeat');
+      this.innermostContourPattern = PatternFactory.createInnermostHatchPattern(
+        this.ctx,
+        ContourConfig.strokeColors[2] // Use color from config
+      );
     }
     return this.innermostContourPattern;
   }
