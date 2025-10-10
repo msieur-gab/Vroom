@@ -4,6 +4,7 @@ import { SceneryRenderer } from './SceneryRenderer.js';
 import { ContourRenderer } from './ContourRenderer.js';
 import { GridConfig } from '../config.js';
 import { PatternFactory } from '../utils/PatternFactory.js';
+import { GridGeometry } from '../utils/GridGeometry.js';
 
 /**
  * CanvasJourneyGrid - High-performance Canvas-based journey visualization
@@ -31,7 +32,16 @@ export class CanvasJourneyGrid {
 
     // Calculate responsive cell size
     this.calculateCellSize();
-    
+
+    // Grid geometry helper for coordinate calculations
+    this.geometry = new GridGeometry(
+      this.CELL_SIZE,
+      this.CELL_PADDING,
+      this.CELLS_PER_ROW,
+      this.HORIZONTAL_PADDING,
+      this.KM_PER_CELL
+    );
+
     // Viewport and scrolling
     this.scrollY = 0;
     this.viewportHeight = 0;
@@ -186,30 +196,10 @@ export class CanvasJourneyGrid {
   
   /**
    * Convert distance to grid coordinates using serpentine pattern
-   * Row 0: L→R, Row 1: R→L, Row 2: L→R, etc.
+   * Delegated to GridGeometry helper
    */
   distanceToCoords(distance) {
-    const cellIndex = Math.ceil(distance / this.KM_PER_CELL);
-    const row = Math.floor(cellIndex / this.CELLS_PER_ROW);
-
-    // Serpentine pattern: alternate direction every row
-    let col;
-    const positionInRow = cellIndex % this.CELLS_PER_ROW;
-
-    if (row % 2 === 0) {
-      // Even rows: Left to Right (normal)
-      col = positionInRow;
-    } else {
-      // Odd rows: Right to Left (reversed)
-      col = this.CELLS_PER_ROW - 1 - positionInRow;
-    }
-
-    // Calculate screen position with horizontal padding
-    const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING));
-    const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING));
-
-    console.log(`🐍 Serpentine: ${distance}km → cell ${cellIndex} → row ${row} (${row % 2 === 0 ? 'L→R' : 'R→L'}) → col ${col}`);
-    return { row, col, cellIndex, x, y };
+    return this.geometry.distanceToCoords(distance);
   }
   
   /**
@@ -389,18 +379,10 @@ export class CanvasJourneyGrid {
   
   /**
    * Calculate serpentine cell index from row/col coordinates
-   * This gives us the proper ordering for serpentine traversal
+   * Delegated to GridGeometry helper
    */
   getSerpentineCellIndex(row, col) {
-    const cellsPerRow = this.CELLS_PER_ROW;
-    const isEvenRow = row % 2 === 0;
-
-    // Even rows go left-to-right (0,1,2,3,4)
-    // Odd rows go right-to-left (4,3,2,1,0)
-    const colInSerpentine = isEvenRow ? col : (cellsPerRow - 1 - col);
-
-    // Cell index = row * cellsPerRow + column position in that row
-    return row * cellsPerRow + colInSerpentine;
+    return this.geometry.getSerpentineCellIndex(row, col);
   }
 
   /**
@@ -477,21 +459,18 @@ export class CanvasJourneyGrid {
 
   /**
    * Get center point of a cell
+   * Delegated to GridGeometry helper
    */
   getCellCenter(row, col) {
-    const x = this.HORIZONTAL_PADDING + this.CELL_PADDING + (col * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
-    const y = this.CELL_PADDING + (row * (this.CELL_SIZE + this.CELL_PADDING)) + this.CELL_SIZE / 2;
-    return { x, y };
+    return this.geometry.getCellCenter(row, col);
   }
 
   /**
    * Get center point of a node
+   * Delegated to GridGeometry helper
    */
   getNodeCenter(node) {
-    return {
-      x: node.coords.x + this.CELL_SIZE / 2,
-      y: node.coords.y + this.CELL_SIZE / 2
-    };
+    return this.geometry.getNodeCenter(node);
   }
   
   /**
@@ -686,7 +665,7 @@ export class CanvasJourneyGrid {
   }
   
   /**
-   * Update OrganicPathfinder with new cell size
+   * Update OrganicPathfinder and GridGeometry with new cell size
    */
   updateOrganicPathfinder() {
     this.organicPathfinder = new OrganicPathfinder(
@@ -695,6 +674,9 @@ export class CanvasJourneyGrid {
       this.CELLS_PER_ROW,
       this.HORIZONTAL_PADDING
     );
+
+    // Update geometry helper with new cell size
+    this.geometry.updateCellSize(this.CELL_SIZE);
   }
 
   /**
