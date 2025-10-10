@@ -12,28 +12,53 @@ import { GridGeometry } from '../utils/GridGeometry.js';
  */
 export class CanvasJourneyGrid {
   constructor(container, grid) {
+    // Core dependencies
     this.container = container;
     this.grid = grid;
     this.canvas = null;
     this.ctx = null;
 
-    // Grid configuration from centralized config
+    // Load grid configuration
+    this.initializeConfig();
+
+    // Initialize rendering subsystems
+    this.initializeRenderers();
+
+    // Initialize data structures
+    this.initializeDataStructures();
+
+    // Create canvas and setup interaction
+    this.init();
+  }
+
+  /**
+   * Initialize grid configuration from centralized config
+   * @private
+   */
+  initializeConfig() {
+    // Grid dimensions
     this.CELLS_PER_ROW = GridConfig.cellsPerRow;
     this.KM_PER_CELL = GridConfig.kmPerCell;
     this.KM_PER_ROW = GridConfig.kmPerRow;
     this.CELL_PADDING = GridConfig.cellPadding;
     this.HORIZONTAL_PADDING = GridConfig.horizontalPadding;
 
-    // Debug configuration
-    this.DEBUG = {
-      showGrid: false,  // Toggle grid cell visibility (for development)
-      showWaypoints: false  // Toggle waypoint debug dots (set in drawWaypointDebug)
-    };
-
     // Calculate responsive cell size
     this.calculateCellSize();
 
-    // Grid geometry helper for coordinate calculations
+    // Debug flags
+    this.DEBUG = {
+      showGrid: false,
+      showWaypoints: false
+    };
+  }
+
+  /**
+   * Initialize rendering subsystems
+   * @private
+   */
+  initializeRenderers() {
+    // Grid geometry helper
     this.geometry = new GridGeometry(
       this.CELL_SIZE,
       this.CELL_PADDING,
@@ -42,16 +67,37 @@ export class CanvasJourneyGrid {
       this.KM_PER_CELL
     );
 
-    // Viewport and scrolling
+    // Organic pathfinder for smooth roads
+    this.organicPathfinder = new OrganicPathfinder(
+      this.CELL_SIZE,
+      this.CELL_PADDING,
+      this.CELLS_PER_ROW,
+      this.HORIZONTAL_PADDING
+    );
+
+    // Specialized renderers
+    this.sceneryRenderer = new SceneryRenderer(this);
+    this.contourRenderer = new ContourRenderer(this);
+
+    // Pattern cache
+    this.biomePatterns = null;
+  }
+
+  /**
+   * Initialize data structures for nodes and caching
+   * @private
+   */
+  initializeDataStructures() {
+    // Viewport state
     this.scrollY = 0;
     this.viewportHeight = 0;
-    
+
     // Node storage
-    this.nodes = new Map(); // distance -> node data
-    this.nodeComponents = new Map(); // distance -> NodeComponent instances
+    this.nodes = new Map();
+    this.nodeComponents = new Map();
     this.maxDistance = 0;
 
-    // Path rendering cache - recalculated only when nodes change
+    // Path rendering cache
     this.pathCache = {
       sortedNodes: null,
       waypoints: null,
@@ -61,27 +107,8 @@ export class CanvasJourneyGrid {
       isDirty: true
     };
 
-    // Organic pathfinder for smooth serpentine roads
-    this.organicPathfinder = new OrganicPathfinder(
-      this.CELL_SIZE,
-      this.CELL_PADDING,
-      this.CELLS_PER_ROW,
-      this.HORIZONTAL_PADDING
-    );
-
-    // Scenery renderer for decorative elements
-    this.sceneryRenderer = new SceneryRenderer(this);
-
-    // Contour renderer for elevation visualization
-    this.contourRenderer = new ContourRenderer(this);
-
-    // Pattern caches (created lazily)
-    this.biomePatterns = null;
-
-    // DOM overlay for interactive nodes
+    // DOM overlay
     this.nodeOverlay = null;
-    
-    this.init();
   }
   
   init() {
