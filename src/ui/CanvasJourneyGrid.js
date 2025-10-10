@@ -681,42 +681,12 @@ export class CanvasJourneyGrid {
     };
   }
 
-  // sampleWaypointInfluence(x, y, waypoints) {
-  //   let value = 0;
-  //   const baseRadius = Math.max(this.CELL_SIZE * 0.45, 45);
-  //   const falloff = baseRadius * baseRadius;
-
-  //   for (let i = 0; i < waypoints.length; i++) {
-  //     const wp = waypoints[i];
-  //     const dx = x - wp.x;
-  //     const dy = y - wp.y;
-  //     const distSq = dx * dx + dy * dy;
-  //     value += Math.exp(-distSq / falloff);
-  //   }
-
-  //   return value;
-  // }
-
-   // 1. Manhattan distance → diamond / parallelogram lobes
-
-  // sampleWaypointInfluence(x, y, waypoints) {
-  //   let value = 0;
-  //   const baseRadius = Math.max(this.CELL_SIZE * 0.45, 45);
-  //   const falloff = baseRadius * baseRadius;
-
-  //   for (let i = 0; i < waypoints.length; i++) {
-  //     const wp = waypoints[i];
-  //     const dx = Math.abs(x - wp.x);
-  //     const dy = Math.abs(y - wp.y);
-  //     const manhattan = dx + dy;
-  //     value += Math.exp(-(manhattan * manhattan) / falloff);
-  //   }
-
-  //   return value;
-  // }
-
-  // 2. Chebyshev distance → square / blocky lobes
-
+  /**
+   * Calculate influence field value at a point using Chebyshev distance.
+   * Chebyshev distance (max of dx, dy) creates square/blocky lobes that
+   * align well with the orthogonal grid structure, producing more geometric
+   * contour patterns than circular (Euclidean) or diamond (Manhattan) shapes.
+   */
   sampleWaypointInfluence(x, y, influencePoints) {
     let value = 0;
     const baseRadius = Math.max(this.CELL_SIZE * 0.6, 60);
@@ -732,30 +702,6 @@ export class CanvasJourneyGrid {
 
     return value;
   }
-
-  // 3. rotated diamonds
-  
-  // sampleWaypointInfluence(x, y, waypoints) {
-  //   let value = 0;
-  //   const baseRadius = Math.max(this.CELL_SIZE * 0.45, 45);
-  //   const falloff = baseRadius * baseRadius;
-  //   const invSqrt2 = Math.SQRT1_2; // 1 / √2
-
-  //   for (let i = 0; i < waypoints.length; i++) {
-  //     const wp = waypoints[i];
-  //     const dx = x - wp.x;
-  //     const dy = y - wp.y;
-
-  //     // Rotate by 45°: x' = (dx - dy)/√2, y' = (dx + dy)/√2
-  //     const rx = (dx - dy) * invSqrt2;
-  //     const ry = (dx + dy) * invSqrt2;
-
-  //     const rotatedManhattan = Math.abs(rx) + Math.abs(ry);
-  //     value += Math.exp(-(rotatedManhattan * rotatedManhattan) / falloff);
-  //   }
-
-  //   return value;
-  // }
 
   generateMarchingSquaresContours(field, customThresholds = null) {
     const thresholds = customThresholds || ContourConfig.thresholds;
